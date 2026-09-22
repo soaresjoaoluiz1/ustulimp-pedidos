@@ -81,8 +81,9 @@ depois Setup Node.js App → **Restart**.
 
 ## Fotos dos produtos
 Arquivos em `public/products/` → entram no build → URL `/pedidos/products/<arquivo>`.
-O `image_url` de cada produto é setado no catálogo (`server/data/products-catalog.js`) antes do 1º seed,
-ou depois pelo admin (Produtos → editar → upload).
+O `image_url` de cada produto fica no catálogo (`server/data/products-catalog.js`, por SKU).
+Ao iniciar, o server preenche sozinho a foto dos produtos que estão SEM foto no banco
+(não sobrescreve upload do admin). Então foto nova = build + push + Update from Remote + Reiniciar.
 
 ## Troubleshooting
 - **503 / "Incomplete response"** → app caiu. Ver `stderr.log` na pasta do app e o log do Passenger na tela do app.

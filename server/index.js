@@ -26,6 +26,20 @@ const PORT = parseInt(process.env.PORT || '3012', 10)
 const NODE_ENV = process.env.NODE_ENV || 'development'
 const BASE = (process.env.BASE_PATH || '').replace(/\/$/, '')  // ex: /pedidos (deploy em ustulimp.com.br/pedidos)
 
+/* Fotos do catálogo: ao iniciar, preenche image_url dos produtos que ainda estão SEM foto
+   (pelo SKU). Não sobrescreve foto enviada pelo admin nem apaga nada. Assim um deploy com
+   fotos novas só precisa de "Update from Remote" + "Reiniciar". */
+try {
+  const { PRODUCTS } = await import('./data/products-catalog.js')
+  const fill = db.prepare(`UPDATE products SET image_url = ?, updated_at = datetime('now')
+                           WHERE sku = ? AND (image_url IS NULL OR image_url = '')`)
+  let n = 0
+  db.transaction(() => { for (const p of PRODUCTS) if (p.image_url) n += fill.run(p.image_url, p.sku).changes })()
+  if (n) console.log(`[ustulimp-pedidos] ${n} foto(s) de produto preenchida(s) do catálogo`)
+} catch (err) {
+  console.error('[ustulimp-pedidos] Falha ao sincronizar fotos do catálogo:', err.message)
+}
+
 const app = express()
 
 app.use(cors({
