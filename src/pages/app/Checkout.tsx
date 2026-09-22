@@ -12,7 +12,12 @@ interface PaymentTerm {
   id: number
   label: string
   days: string
+  /** Formas de pagamento que o prazo aceita (vem do server) */
+  methods: PaymentMethod[]
 }
+
+type PaymentMethod = 'boleto' | 'pix' | 'dinheiro'
+const METHOD_LABEL: Record<PaymentMethod, string> = { boleto: 'Boleto', pix: 'PIX', dinheiro: 'Dinheiro' }
 
 const STEPS = [
   { key: 'cart',    label: 'Carrinho' },
@@ -23,12 +28,12 @@ type StepKey = typeof STEPS[number]['key']
 
 export default function Checkout() {
   const navigate = useNavigate()
-  const { customer } = useAuth()
-  const { items, subtotal, totalQty, totalPeso, totalVolume, updateQty, removeItem, clear } = useCart()
+  const { customer, refresh } = useAuth()
+  const { items, subtotal, totalQty, totalPeso, totalVolume, updateQty, updatePrice, removeItem, removeMany, clear } = useCart()
   const [step, setStep] = useState<StepKey>('cart')
   const [paymentTerms, setPaymentTerms] = useState<PaymentTerm[]>([])
   const [paymentTerm, setPaymentTerm] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('boleto')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('')
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -36,7 +41,37 @@ export default function Checkout() {
     api.get<{ payment_terms: PaymentTerm[] }>('/orders/_/payment-terms')
       .then(d => setPaymentTerms(d.payment_terms))
       .catch(() => {})
+    /* Recarrega os dados do cliente: o admin pode ter mudado o pedido mínimo
+       ou a tabela depois que ele logou. */
+    refresh()
+
+    /* Revalida o carrinho contra o catálogo: preço mudado é atualizado e produto que
+       saiu da tabela é removido — senão o cliente confirma um total que o servidor recusa. */
+    api.get<{ products: { id: number; price: number }[] }>('/catalog')
+      .then(({ products }) => {
+        const priceById = new Map(products.map(p => [p.id, p.price]))
+        const sumiram = items.filter(i => !priceById.has(i.product_id)).map(i => i.product_id)
+        const mudaram = items.filter(i => priceById.has(i.product_id) && priceById.get(i.product_id) !== i.price)
+        if (sumiram.length) {
+          removeMany(sumiram)
+          toast.error(`${sumiram.length === 1 ? 'Um produto saiu' : `${sumiram.length} produtos saíram`} do catálogo e ${sumiram.length === 1 ? 'foi removido' : 'foram removidos'} do carrinho.`)
+        }
+        if (mudaram.length) {
+          mudaram.forEach(i => updatePrice(i.product_id, priceById.get(i.product_id)!))
+          toast.info(`Preço atualizado em ${mudaram.length} ${mudaram.length === 1 ? 'produto' : 'produtos'}.`)
+        }
+      })
+      .catch(() => {})
   }, [])
+
+  const selectedTerm = paymentTerms.find(t => t.label === paymentTerm) || null
+  const allowedMethods: PaymentMethod[] = selectedTerm?.methods || []
+
+  /* Trocou o prazo: a forma de pagamento acompanha (e escolhe sozinha quando só tem uma). */
+  useEffect(() => {
+    if (!selectedTerm) { setPaymentMethod(''); return }
+    setPaymentMethod(prev => (prev && allowedMethods.includes(prev)) ? prev : (allowedMethods[0] || ''))
+  }, [paymentTerm, paymentTerms])
 
   /* Redireciona pro catálogo se carrinho vazio */
   useEffect(() => {
@@ -51,6 +86,9 @@ export default function Checkout() {
 
   async function submit() {
     if (!paymentTerm) { toast.error('Escolha um prazo de pagamento'); return }
+    if (!paymentMethod || !allowedMethods.includes(paymentMethod)) {
+      toast.error('Escolha uma forma de pagamento válida pro prazo selecionado'); return
+    }
     if (belowMinimum) {
       toast.error(`Pedido mínimo de ${fmtBRL(minimumOrderValue)}. Adicione mais produtos.`)
       return
@@ -66,7 +104,15 @@ export default function Checkout() {
       clear()
       navigate(`/app/orders/${res.id}?confirmed=1`, { replace: true })
     } catch (err: any) {
-      toast.error(err.message)
+      /* Produto saiu do catálogo/da tabela no meio da compra: tira do carrinho pra não travar o cliente */
+      const ids = err?.data?.product_ids
+      if (Array.isArray(ids) && ids.length) {
+        removeMany(ids)
+        toast.error(`${err.message} Já tiramos do seu carrinho.`)
+        setStep('cart')
+      } else {
+        toast.error(err.message)
+      }
     } finally { setSubmitting(false) }
   }
 
@@ -100,13 +146,16 @@ export default function Checkout() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-navy-800 line-clamp-2">{item.name}</div>
-                        <div className="text-xs text-slate-500">SKU {item.sku || '—'} · {fmtBRL(item.price)}/{item.unit || 'cx'}</div>
+                        <div className="text-xs text-slate-500">
+                          SKU {item.sku || '—'} · {fmtBRL(item.price)}/cx
+                          {item.units_per_box ? ` · caixa c/ ${item.units_per_box} un.` : ''}
+                        </div>
                         <div className="flex items-center gap-2 mt-2">
                           <div className="flex items-center bg-slate-100 rounded-md">
                             <button onClick={() => updateQty(item.product_id, item.quantity - 1)} className="w-7 h-7 hover:bg-slate-200 rounded-l-md flex items-center justify-center">
                               <Minus className="w-3.5 h-3.5" />
                             </button>
-                            <input type="number" value={item.quantity} onChange={e => updateQty(item.product_id, parseInt(e.target.value || '0', 10))} className="w-12 text-center text-sm font-bold bg-transparent outline-none" />
+                            <input type="number" min={1} max={999} value={item.quantity} onChange={e => updateQty(item.product_id, Number(e.target.value))} className="w-12 text-center text-sm font-bold bg-transparent outline-none" />
                             <button onClick={() => updateQty(item.product_id, item.quantity + 1)} className="w-7 h-7 hover:bg-slate-200 rounded-r-md flex items-center justify-center">
                               <Plus className="w-3.5 h-3.5" />
                             </button>
@@ -137,26 +186,37 @@ export default function Checkout() {
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-600 mb-1.5">Como pretende pagar?</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { v: 'boleto',    l: 'Boleto' },
-                        { v: 'pix',       l: 'PIX' },
-                        { v: 'dinheiro',  l: 'Dinheiro' }
-                      ].map(o => (
-                        <button
-                          key={o.v}
-                          onClick={() => setPaymentMethod(o.v)}
-                          className={cn(
-                            'py-2.5 px-3 rounded-lg border-2 text-sm font-semibold transition',
-                            paymentMethod === o.v
-                              ? 'border-navy-800 bg-navy-50 text-navy-800'
-                              : 'border-slate-200 text-slate-600 hover:border-slate-300'
-                          )}
-                        >
-                          {o.l}
-                        </button>
-                      ))}
-                    </div>
+                    {!selectedTerm ? (
+                      <div className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                        Escolha o prazo acima pra ver as formas de pagamento.
+                      </div>
+                    ) : (
+                      <>
+                        <div className={cn('grid gap-2', allowedMethods.length === 1 ? 'grid-cols-1' : 'grid-cols-2')}>
+                          {allowedMethods.map(m => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setPaymentMethod(m)}
+                              aria-pressed={paymentMethod === m}
+                              className={cn(
+                                'py-2.5 px-3 rounded-lg border-2 text-sm font-semibold transition',
+                                paymentMethod === m
+                                  ? 'border-navy-800 bg-navy-50 text-navy-800'
+                                  : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                              )}
+                            >
+                              {METHOD_LABEL[m]}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1.5">
+                          {allowedMethods.includes('boleto')
+                            ? `"${selectedTerm.label}" é pagamento a prazo, então vai por boleto.`
+                            : `"${selectedTerm.label}" é pagamento à vista: ${allowedMethods.map(m => METHOD_LABEL[m]).join(' ou ')}.`}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <Textarea
@@ -209,10 +269,12 @@ export default function Checkout() {
                   <span className="flex items-center gap-1"><Package className="w-3 h-3" />Peso bruto</span>
                   <span className="font-semibold">{fmtNumber(totalPeso, 2)} kg</span>
                 </div>
-                <div className="flex justify-between text-xs text-slate-600">
-                  <span className="flex items-center gap-1"><Box className="w-3 h-3" />Volume</span>
-                  <span className="font-semibold">{fmtNumber(totalVolume, 4)} m³</span>
-                </div>
+                {totalVolume > 0 && (
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span className="flex items-center gap-1"><Box className="w-3 h-3" />Volume</span>
+                    <span className="font-semibold">{fmtNumber(totalVolume, 4)} m³</span>
+                  </div>
+                )}
               </div>
 
               {belowMinimum && (
@@ -239,7 +301,7 @@ export default function Checkout() {
                   <Button
                     onClick={submit}
                     loading={submitting}
-                    disabled={belowMinimum}
+                    disabled={belowMinimum || !paymentTerm || !paymentMethod}
                     className="w-full"
                     size="lg"
                     variant="success"

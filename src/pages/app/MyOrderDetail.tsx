@@ -13,12 +13,14 @@ export default function MyOrderDetail() {
   const [searchParams] = useSearchParams()
   const justConfirmed = searchParams.get('confirmed') === '1'
   const [data, setData] = useState<any>(null)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [cartOpen, setCartOpen] = useState(false)
 
   useEffect(() => {
     api.get<{ order: any; items: any[] }>(`/orders/${id}`)
       .then(setData)
+      .catch(err => setError(err.message || 'Não foi possível abrir esse pedido'))
       .finally(() => setLoading(false))
   }, [id])
 
@@ -30,7 +32,17 @@ export default function MyOrderDetail() {
     )
   }
 
-  if (!data) return null
+  if (!data) {
+    return (
+      <CustomerLayout onCartClick={() => setCartOpen(true)}>
+        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+          <h1 className="font-display text-xl font-bold text-navy-800 mb-2">Pedido não encontrado</h1>
+          <p className="text-sm text-slate-500 mb-5">{error || 'Esse pedido não existe ou não é da sua conta.'}</p>
+          <Link to="/app/orders"><Button>Ver meus pedidos</Button></Link>
+        </div>
+      </CustomerLayout>
+    )
+  }
   const { order, items } = data
 
   return (
@@ -92,8 +104,8 @@ export default function MyOrderDetail() {
             </div>
             <div className="px-5 py-4 bg-slate-50 flex items-center justify-between">
               <div className="text-xs text-slate-500">
-                <Package className="w-3 h-3 inline mr-1" />Peso {fmtNumber(order.peso_total_kg, 2)}kg ·
-                <Box className="w-3 h-3 inline mx-1" />Volume {fmtNumber(order.volume_total_m3, 4)}m³
+                <Package className="w-3 h-3 inline mr-1" />Peso {fmtNumber(order.peso_total_kg, 2)}kg
+                {order.volume_total_m3 > 0 && (<> · <Box className="w-3 h-3 inline mx-1" />Volume {fmtNumber(order.volume_total_m3, 4)}m³</>)}
               </div>
               <div className="font-display text-2xl font-extrabold text-navy-800">{fmtBRL(order.total_value)}</div>
             </div>

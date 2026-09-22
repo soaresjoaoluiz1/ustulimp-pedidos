@@ -4,21 +4,27 @@ export const fmtBRL = (v: number | null | undefined) =>
 export const fmtNumber = (v: number | null | undefined, digits = 0) =>
   (v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 
+/** O SQLite grava datetime('now') em UTC sem fuso. Sem o "Z" o navegador lia como hora local (3h adiantado). */
+function parseDbDate(iso: string) {
+  const s = iso.includes('T') ? iso : iso.replace(' ', 'T')
+  return new Date(/[zZ]|[+-]\d{2}:?\d{2}$/.test(s) ? s : s + 'Z')
+}
+
 export const fmtDate = (iso: string | null | undefined) => {
   if (!iso) return '—'
-  const d = new Date(iso.replace(' ', 'T'))
+  const d = parseDbDate(iso)
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 export const fmtDateTime = (iso: string | null | undefined) => {
   if (!iso) return '—'
-  const d = new Date(iso.replace(' ', 'T'))
+  const d = parseDbDate(iso)
   return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 export const fmtRelative = (iso: string | null | undefined) => {
   if (!iso) return '—'
-  const d = new Date(iso.replace(' ', 'T'))
+  const d = parseDbDate(iso)
   const diff = Date.now() - d.getTime()
   const min = Math.floor(diff / 60000)
   if (min < 1) return 'agora'

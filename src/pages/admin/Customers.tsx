@@ -322,7 +322,7 @@ function CustomerModal({ customer, priceTables, paymentTerms, onClose, onSaved }
                   ))}
               {!allTermsAllowed && allowedTermIds.length === 0 && (
                 <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-2">
-                  ⚠ Nenhum prazo selecionado — cliente não vai conseguir finalizar pedido.
+                  Nenhum prazo marcado = cliente pode usar TODOS os prazos ativos. Marque pra restringir.
                 </div>
               )}
             </div>

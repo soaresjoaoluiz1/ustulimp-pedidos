@@ -1,4 +1,4 @@
-const TOKEN_KEY = 'oxi_pedidos_token'
+const TOKEN_KEY = 'ustulimp_pedidos_token'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)

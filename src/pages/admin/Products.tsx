@@ -196,7 +196,7 @@ function ProductModal({ product, categories, onClose, onSaved }: { product: Prod
 
     setUploading(true)
     try {
-      const res = await fetch('/api/admin/upload', {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/admin/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
         body: fd

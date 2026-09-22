@@ -47,6 +47,7 @@ export default function ProductCard({ variants, onDetails }: { variants: Product
       volume_m3: product.volume_m3,
       image_url: product.image_url,
       category_name: product.category_name,
+      units_per_box: product.units_per_box,
     }, localQty)
     setJustAdded(true)
     setLocalQty(1)

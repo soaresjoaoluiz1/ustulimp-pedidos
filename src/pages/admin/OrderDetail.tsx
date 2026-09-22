@@ -32,6 +32,9 @@ export default function OrderDetail() {
       setData(d)
       setAdminNotes(d.order.admin_notes || '')
       setNewStatus(d.order.status)
+    } catch (err: any) {
+      toast.error(err.message || 'Não foi possível abrir esse pedido')
+      setData(null)
     } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [id])
@@ -116,7 +119,7 @@ export default function OrderDetail() {
             </div>
             <div className="px-5 py-4 border-t-2 border-slate-100 bg-slate-50 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-500">Total · Peso {fmtNumber(order.peso_total_kg, 2)}kg · Volume {fmtNumber(order.volume_total_m3, 4)}m³</div>
+                <div className="text-xs text-slate-500">Total · Peso {fmtNumber(order.peso_total_kg, 2)}kg{order.volume_total_m3 > 0 ? ` · Volume ${fmtNumber(order.volume_total_m3, 4)}m³` : ''}</div>
               </div>
               <div className="font-display text-2xl font-extrabold text-navy-800">{fmtBRL(order.total_value)}</div>
             </div>

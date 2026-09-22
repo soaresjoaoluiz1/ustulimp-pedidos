@@ -25,7 +25,7 @@ export default function OrderPrint() {
   useEffect(() => {
     if (!user) return
     const path = user.role === 'admin' ? `/admin/orders/${id}` : `/orders/${id}`
-    api.get(path).then(setData).finally(() => setLoading(false))
+    api.get(path).then(setData).catch(() => setData(null)).finally(() => setLoading(false))
   }, [id, user])
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export default function OrderPrint() {
               <div><span className="text-slate-500">Forma:</span> <strong className="capitalize">{order.payment_method || '—'}</strong></div>
               <div className="pt-2 mt-2 border-t border-slate-100">
                 <div className="text-slate-500">Peso bruto: <strong>{fmtNumber(order.peso_total_kg, 2)} kg</strong></div>
-                <div className="text-slate-500">Volume: <strong>{fmtNumber(order.volume_total_m3, 4)} m³</strong></div>
+                {order.volume_total_m3 > 0 && <div className="text-slate-500">Volume: <strong>{fmtNumber(order.volume_total_m3, 4)} m³</strong></div>}
               </div>
             </div>
           </div>

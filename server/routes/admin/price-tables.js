@@ -62,6 +62,21 @@ router.put('/:id/items', (req, res) => {
   `)
   const remove = db.prepare('DELETE FROM price_table_items WHERE price_table_id = ? AND product_id = ?')
 
+  /* Valida antes de gravar: preço > 0 e produto existente (um "-50" colado por engano
+     entrava no catálogo e derrubava o total do pedido) */
+  const productExists = db.prepare('SELECT 1 FROM products WHERE id = ?')
+  for (const it of items) {
+    const pid = parseInt(it.product_id, 10)
+    if (!pid || !productExists.get(pid)) return res.status(400).json({ error: `Produto ${it.product_id} não existe` })
+    if (it.remove) continue
+    const price = Number(it.price)
+    if (!Number.isFinite(price) || price <= 0) {
+      return res.status(400).json({ error: `Preço inválido pro produto ${pid}: use um número maior que zero` })
+    }
+    it.product_id = pid
+    it.price = +price.toFixed(2)
+  }
+
   let updated = 0, removed = 0
   const tx = db.transaction(() => {
     for (const it of items) {

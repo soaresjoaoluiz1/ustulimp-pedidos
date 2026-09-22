@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import db from '../../db.js'
+import { buildUpdate, asText, asNumber, asBool, asJson } from '../../lib/update.js'
 
 const router = Router()
 
@@ -80,41 +81,26 @@ router.post('/', (req, res) => {
   }
 })
 
-/* PUT /api/admin/products/:id */
+/* PUT /api/admin/products/:id — grava só o que veio no body (campo vazio LIMPA o valor) */
 router.put('/:id', (req, res) => {
   const cur = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id)
   if (!cur) return res.status(404).json({ error: 'Produto não encontrado' })
 
-  const b = req.body
-  db.prepare(`
-    UPDATE products SET
-      sku = COALESCE(?, sku),
-      name = COALESCE(?, name),
-      short_use = COALESCE(?, short_use),
-      description = COALESCE(?, description),
-      category_id = COALESCE(?, category_id),
-      unit = COALESCE(?, unit),
-      image_url = COALESCE(?, image_url),
-      market_price = COALESCE(?, market_price),
-      suggested_sale_price = COALESCE(?, suggested_sale_price),
-      units_per_box = COALESCE(?, units_per_box),
-      peso_kg = COALESCE(?, peso_kg),
-      volume_m3 = COALESCE(?, volume_m3),
-      tags = COALESCE(?, tags),
-      featured = COALESCE(?, featured),
-      is_active = COALESCE(?, is_active),
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    b.sku ?? null, b.name ?? null, b.short_use ?? null, b.description ?? null,
-    b.category_id ?? null, b.unit ?? null, b.image_url ?? null,
-    b.market_price ?? null, b.suggested_sale_price ?? null, b.units_per_box ?? null,
-    b.peso_kg ?? null, b.volume_m3 ?? null,
-    b.tags !== undefined ? JSON.stringify(b.tags) : null,
-    b.featured === undefined ? null : (b.featured ? 1 : 0),
-    b.is_active === undefined ? null : (b.is_active ? 1 : 0),
-    req.params.id
-  )
+  const upd = buildUpdate('products', req.body, {
+    sku: asText, name: asText, short_use: asText, description: asText,
+    category_id: asNumber, unit: asText, units_per_box: asNumber, image_url: asText,
+    market_price: asNumber, suggested_sale_price: asNumber,
+    peso_kg: v => asNumber(v) || 0, volume_m3: v => asNumber(v) || 0,
+    tags: asJson, featured: asBool, is_active: asBool,
+  })
+  if (!upd) return res.json({ ok: true })
+
+  try {
+    db.prepare(upd.sql).run(...upd.params, req.params.id)
+  } catch (err) {
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(409).json({ error: 'SKU já existe' })
+    throw err
+  }
   res.json({ ok: true })
 })
 

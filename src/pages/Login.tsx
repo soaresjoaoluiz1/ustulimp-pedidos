@@ -92,10 +92,11 @@ export default function Login() {
               </Button>
             </form>
 
-            <div className="mt-5 text-center">
-              <a href="#" className="text-sm font-semibold text-navy-700 hover:text-navy-900">
-                Esqueci minha senha
-              </a>
+            <div className="mt-5 text-center text-xs text-slate-500">
+              Esqueceu a senha?{' '}
+              {waLink('Olá! Esqueci a senha do portal de pedidos da USTULIMP.')
+                ? <a href={waLink('Olá! Esqueci a senha do portal de pedidos da USTULIMP.')!} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-blue">Chame no WhatsApp</a>
+                : <span>Fale com o comercial pra gerar uma nova.</span>}
             </div>
           </div>
 

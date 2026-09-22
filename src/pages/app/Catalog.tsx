@@ -352,7 +352,8 @@ function ProductDetailContent({ variants }: { variants: CatalogProduct[] }) {
         onClick={() => addItem({
           product_id: product.id, sku: product.sku, name: product.name, unit: product.unit,
           price: product.price, peso_kg: product.peso_kg, volume_m3: product.volume_m3,
-          image_url: product.image_url, category_name: product.category_name
+          image_url: product.image_url, category_name: product.category_name,
+          units_per_box: product.units_per_box
         })}
       >
         {inCart > 0 ? `Adicionar mais 1 caixa (já tem ${inCart})` : 'Adicionar 1 caixa ao carrinho'}

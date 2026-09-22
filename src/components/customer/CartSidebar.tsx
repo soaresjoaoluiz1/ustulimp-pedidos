@@ -75,7 +75,10 @@ export default function CartSidebar({ open, onClose }: Props) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm text-navy-800 line-clamp-2 leading-snug">{item.name}</div>
-                    <div className="text-xs text-slate-500">SKU {item.sku || '—'} · {fmtBRL(item.price)}</div>
+                    <div className="text-xs text-slate-500">
+                      SKU {item.sku || '—'} · {fmtBRL(item.price)}/cx
+                      {item.units_per_box ? ` · c/ ${item.units_per_box} un.` : ''}
+                    </div>
                     <div className="flex items-center gap-2 mt-2">
                       <div className="flex items-center bg-slate-100 rounded-md">
                         <button onClick={() => updateQty(item.product_id, item.quantity - 1)} className="w-7 h-7 hover:bg-slate-200 rounded-l-md flex items-center justify-center">
@@ -83,8 +86,10 @@ export default function CartSidebar({ open, onClose }: Props) {
                         </button>
                         <input
                           type="number"
+                          min={1}
+                          max={999}
                           value={item.quantity}
-                          onChange={e => updateQty(item.product_id, parseInt(e.target.value || '0', 10))}
+                          onChange={e => updateQty(item.product_id, Number(e.target.value))}
                           className="w-10 text-center text-sm font-bold bg-transparent outline-none"
                         />
                         <button onClick={() => updateQty(item.product_id, item.quantity + 1)} className="w-7 h-7 hover:bg-slate-200 rounded-r-md flex items-center justify-center">
@@ -114,10 +119,12 @@ export default function CartSidebar({ open, onClose }: Props) {
                   <span className="flex items-center gap-1"><Package className="w-3 h-3" />Peso</span>
                   <span>{fmtNumber(totalPeso, 2)} kg</span>
                 </div>
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span className="flex items-center gap-1"><Box className="w-3 h-3" />Volume</span>
-                  <span>{fmtNumber(totalVolume, 4)} m³</span>
-                </div>
+                {totalVolume > 0 && (
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span className="flex items-center gap-1"><Box className="w-3 h-3" />Volume</span>
+                    <span>{fmtNumber(totalVolume, 4)} m³</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between font-display">

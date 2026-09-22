@@ -1,11 +1,14 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
+import { randomBytes } from 'crypto'
+import { buildUpdate, asText, asNumber, asBool } from '../../lib/update.js'
 import db from '../../db.js'
 
 const router = Router()
 
 function generatePassword() {
-  return Math.random().toString(36).slice(-8)
+  /* aleatório de verdade (Math.random é previsível) — 12 chars sem caractere ambíguo */
+  return randomBytes(9).toString('base64url').replace(/[-_]/g, 'x').slice(0, 12)
 }
 
 function parseAllowedTerms(row) {
@@ -126,49 +129,30 @@ router.post('/', (req, res) => {
   })
 })
 
-/* PUT /api/admin/customers/:id */
+/* PUT /api/admin/customers/:id — grava só o que veio no body (campo vazio LIMPA o valor) */
 router.put('/:id', (req, res) => {
   const cur = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id)
   if (!cur) return res.status(404).json({ error: 'Cliente não encontrado' })
-  const b = req.body
-  /* allowed_payment_term_ids: undefined = não muda; null/[] = libera todos; [ids] = restringe */
-  let paymentTermsValue = undefined
+  const b = { ...req.body }
+
+  /* allowed_payment_term_ids: ausente = não muda; [] ou null = todos os prazos liberados;
+     [ids] = só esses. (Pra travar o cliente use is_active = 0.) */
   if (b.allowed_payment_term_ids !== undefined) {
-    paymentTermsValue = (Array.isArray(b.allowed_payment_term_ids) && b.allowed_payment_term_ids.length > 0)
+    b.allowed_payment_term_ids = (Array.isArray(b.allowed_payment_term_ids) && b.allowed_payment_term_ids.length > 0)
       ? JSON.stringify(b.allowed_payment_term_ids.map(Number))
       : null
   }
 
-  db.prepare(`
-    UPDATE customers SET
-      name = COALESCE(?, name),
-      company_name = COALESCE(?, company_name),
-      document = COALESCE(?, document),
-      document_type = COALESCE(?, document_type),
-      phone = COALESCE(?, phone),
-      whatsapp = COALESCE(?, whatsapp),
-      city = COALESCE(?, city),
-      state = COALESCE(?, state),
-      address = COALESCE(?, address),
-      zip_code = COALESCE(?, zip_code),
-      distance_km = COALESCE(?, distance_km),
-      price_table_id = COALESCE(?, price_table_id),
-      minimum_order_value = COALESCE(?, minimum_order_value),
-      notes = COALESCE(?, notes),
-      is_active = COALESCE(?, is_active),
-      allowed_payment_term_ids = CASE WHEN ? = 'KEEP' THEN allowed_payment_term_ids ELSE ? END,
-      updated_at = datetime('now')
-    WHERE id = ?
-  `).run(
-    b.name ?? null, b.company_name ?? null, b.document ?? null, b.document_type ?? null,
-    b.phone ?? null, b.whatsapp ?? null, b.city ?? null, b.state ?? null,
-    b.address ?? null, b.zip_code ?? null, b.distance_km ?? null,
-    b.price_table_id ?? null, b.minimum_order_value ?? null, b.notes ?? null,
-    b.is_active === undefined ? null : (b.is_active ? 1 : 0),
-    paymentTermsValue === undefined ? 'KEEP' : 'UPDATE',
-    paymentTermsValue === undefined ? null : paymentTermsValue,
-    req.params.id
-  )
+  const upd = buildUpdate('customers', b, {
+    name: asText, company_name: asText, document: asText, document_type: asText,
+    phone: asText, whatsapp: asText, city: asText, state: asText,
+    address: asText, zip_code: asText, distance_km: asNumber,
+    price_table_id: asNumber, minimum_order_value: v => asNumber(v) || 0,
+    notes: asText, is_active: asBool,
+    allowed_payment_term_ids: asText,
+  })
+  if (upd) db.prepare(upd.sql).run(...upd.params, req.params.id)
+
   /* Sincroniza is_active no user vinculado */
   if (b.is_active !== undefined && cur.user_id) {
     db.prepare('UPDATE users SET is_active = ? WHERE id = ?').run(b.is_active ? 1 : 0, cur.user_id)
@@ -184,7 +168,7 @@ router.post('/:id/reset-password', (req, res) => {
 
   const newPass = generatePassword()
   const hash = bcrypt.hashSync(newPass, 10)
-  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, cur.user_id)
+  db.prepare(`UPDATE users SET password = ?, password_changed_at = strftime('%Y-%m-%d %H:%M:%f','now') WHERE id = ?`).run(hash, cur.user_id)
   res.json({ ok: true, temp_password: newPass })
 })
 

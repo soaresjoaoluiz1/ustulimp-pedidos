@@ -33,7 +33,20 @@ router.put('/:id', (req, res) => {
 })
 
 router.delete('/:id', (req, res) => {
-  db.prepare('DELETE FROM payment_terms WHERE id = ?').run(req.params.id)
+  const id = parseInt(req.params.id, 10)
+  /* Se algum cliente só pode usar esse prazo, apagar deixaria ele sem como fechar pedido.
+     Nesse caso só desativa (some do checkout, mas não quebra o cadastro). */
+  const inUse = db.prepare(`
+    SELECT COUNT(*) AS n FROM customers
+    WHERE allowed_payment_term_ids IS NOT NULL
+      AND (allowed_payment_term_ids LIKE ? OR allowed_payment_term_ids LIKE ? OR allowed_payment_term_ids LIKE ?)
+  `).get(`[${id}]`, `[${id},%`, `%,${id}%`).n
+
+  if (inUse > 0) {
+    db.prepare('UPDATE payment_terms SET is_active = 0 WHERE id = ?').run(id)
+    return res.json({ ok: true, deactivated: true, message: `Prazo desativado (está vinculado a ${inUse} cliente(s), então não foi apagado).` })
+  }
+  db.prepare('DELETE FROM payment_terms WHERE id = ?').run(id)
   res.json({ ok: true })
 })
 

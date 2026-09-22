@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, KeyRound } from 'lucide-react'
+import { Plus, Trash2, KeyRound, Pencil } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Card, Button, Input, Modal, toast } from '@/components/ui'
 import { PageHeader } from '@/components/admin/AdminLayout'
@@ -63,7 +63,10 @@ export default function Settings() {
                     <div className="font-semibold text-navy-800 text-sm">{t.label}</div>
                     <div className="text-xs text-slate-500">{t.days} dias · pos {t.position}</div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(t)} className="text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(t)} aria-label={`Editar ${t.label}`}><Pencil className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(t)} className="text-red-500 hover:bg-red-50" aria-label={`Excluir ${t.label}`}><Trash2 className="w-4 h-4" /></Button>
+                  </div>
                 </div>
               ))}
             </div>

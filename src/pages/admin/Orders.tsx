@@ -61,13 +61,13 @@ export default function Orders() {
       const params = new URLSearchParams()
       if (status) params.set('status', status)
       if (includeItems) params.set('include_items', '1')
-      const url = `/api/admin/orders/export.csv${params.toString() ? '?' + params : ''}`
+      const url = `${import.meta.env.BASE_URL}api/admin/orders/export.csv${params.toString() ? '?' + params : ''}`
       const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } })
       if (!res.ok) throw new Error('Falha no export')
       const blob = await res.blob()
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `pedidos-oxi-${new Date().toISOString().slice(0,10)}.csv`
+      link.download = `pedidos-ustulimp-${new Date().toISOString().slice(0,10)}.csv`
       link.click()
       toast.success('CSV gerado')
     } catch (err: any) {

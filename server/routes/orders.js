@@ -3,9 +3,11 @@ import db from '../db.js'
 import { requireAuth, requireCustomer } from '../middleware/auth.js'
 import { sendMail } from '../lib/mailer.js'
 import { adminNewOrderTemplate, customerOrderConfirmedTemplate } from '../lib/email-templates.js'
+import { allowedTermsForCustomer, methodsForTerm, PAYMENT_METHODS } from '../lib/payments.js'
 
 const router = Router()
 
+/* Gera dentro da transação do INSERT (dois pedidos no mesmo segundo geravam o mesmo número) */
 function generateOrderNumber() {
   const year = new Date().getFullYear()
   const last = db.prepare(`
@@ -37,9 +39,12 @@ router.get('/', requireAuth, requireCustomer, (req, res) => {
 /* GET /api/orders/:id — detalhe (só do próprio cliente) */
 router.get('/:id', requireAuth, requireCustomer, (req, res) => {
   const order = db.prepare(`
-    SELECT o.*, pt.name AS price_table_name
+    SELECT o.*, pt.name AS price_table_name,
+           c.name AS customer_name, c.company_name, c.document, c.document_type,
+           c.phone, c.whatsapp, c.city, c.state, c.address, c.zip_code
     FROM orders o
     LEFT JOIN price_tables pt ON pt.id = o.price_table_id
+    LEFT JOIN customers c ON c.id = o.customer_id
     WHERE o.id = ? AND o.customer_id = ?
   `).get(req.params.id, req.customer.id)
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' })
@@ -68,6 +73,26 @@ router.post('/', requireAuth, requireCustomer, (req, res) => {
     return res.status(400).json({ error: 'Cliente sem tabela de preço vinculada' })
   }
   const tableId = req.customer.price_table_id
+  const table = db.prepare('SELECT * FROM price_tables WHERE id = ?').get(tableId)
+  if (!table || !table.is_active) {
+    return res.status(400).json({ error: 'Sua tabela de preço está inativa. Fale com o comercial.' })
+  }
+
+  /* Prazo precisa existir e estar liberado pra ESTE cliente */
+  const term = allowedTermsForCustomer(req.customer).find(t => t.label === payment_term)
+  if (!term) {
+    return res.status(400).json({ error: 'Prazo de pagamento inválido ou não liberado pra sua conta' })
+  }
+
+  /* Forma de pagamento tem que combinar com o prazo (28 dias = boleto; à vista = PIX/dinheiro) */
+  const methods = methodsForTerm(term.days)
+  if (!payment_method || !methods.includes(payment_method)) {
+    return res.status(400).json({
+      error: `Pra "${term.label}" a forma de pagamento precisa ser ${methods.map(m => PAYMENT_METHODS[m]).join(' ou ')}.`,
+      code: 'PAYMENT_METHOD_NOT_ALLOWED',
+      allowed_methods: methods
+    })
+  }
 
   /* Valida e busca preço de cada item */
   const validatedItems = []
@@ -84,13 +109,17 @@ router.post('/', requireAuth, requireCustomer, (req, res) => {
   `)
 
   for (const it of items) {
-    const qty = parseFloat(it.quantity)
-    if (!it.product_id || !qty || qty <= 0) {
-      return res.status(400).json({ error: `Item inválido: product_id=${it.product_id}, quantity=${it.quantity}` })
+    const qty = Number(it.quantity)
+    if (!it.product_id || !Number.isInteger(qty) || qty <= 0 || qty > 999) {
+      return res.status(400).json({ error: `Quantidade inválida no item ${it.product_id}: use um número inteiro de caixas entre 1 e 999.` })
     }
     const row = stmt.get(tableId, it.product_id)
-    if (!row || !row.product_active) return res.status(400).json({ error: `Produto ${it.product_id} indisponível` })
-    if (!row.price || !row.pti_active) return res.status(400).json({ error: `Produto "${row.name}" não tem preço na sua tabela` })
+    if (!row || !row.product_active) {
+      return res.status(400).json({ error: `O produto "${row?.name || it.product_id}" saiu do catálogo. Remova do carrinho pra continuar.`, code: 'ITEM_UNAVAILABLE', product_ids: [it.product_id] })
+    }
+    if (!row.price || row.price <= 0 || !row.pti_active) {
+      return res.status(400).json({ error: `O produto "${row.name}" não está na sua tabela de preço. Remova do carrinho pra continuar.`, code: 'ITEM_UNAVAILABLE', product_ids: [it.product_id] })
+    }
 
     const itemSubtotal = +(row.price * qty).toFixed(2)
     validatedItems.push({
@@ -131,10 +160,10 @@ router.post('/', requireAuth, requireCustomer, (req, res) => {
   }
 
   /* Cria pedido + items + history em transação */
-  const orderNumber = generateOrderNumber()
-  let orderId
+  let orderId, orderNumber
 
   const tx = db.transaction(() => {
+    orderNumber = generateOrderNumber()
     const r = db.prepare(`
       INSERT INTO orders (
         order_number, customer_id, price_table_id, status,
@@ -144,8 +173,8 @@ router.post('/', requireAuth, requireCustomer, (req, res) => {
     `).run(
       orderNumber, req.customer.id, tableId,
       subtotal, subtotal,
-      payment_term || null, payment_method || null, notes || null,
-      Math.round(count), peso, volume
+      term.label, payment_method, notes || null,
+      validatedItems.length, peso, volume
     )
     orderId = r.lastInsertRowid
 
@@ -177,6 +206,7 @@ router.post('/', requireAuth, requireCustomer, (req, res) => {
     order_number: orderNumber,
     total_value: subtotal,
     items_count: validatedItems.length,
+    boxes_count: Math.round(count),
     peso_total_kg: peso,
     volume_total_m3: volume,
     message: 'Pedido enviado com sucesso. Um consultor entrará em contato.'
@@ -209,30 +239,7 @@ async function sendOrderEmails({ orderId, customer, userEmail }) {
    Se o customer tem allowed_payment_term_ids definido, filtra por eles.
    Se NULL/vazio, retorna todos (compatibilidade). */
 router.get('/_/payment-terms', requireAuth, requireCustomer, (req, res) => {
-  let allowedIds = null
-  try {
-    allowedIds = req.customer.allowed_payment_term_ids
-      ? JSON.parse(req.customer.allowed_payment_term_ids)
-      : null
-  } catch {
-    allowedIds = null
-  }
-
-  let rows
-  if (Array.isArray(allowedIds) && allowedIds.length > 0) {
-    const placeholders = allowedIds.map(() => '?').join(',')
-    rows = db.prepare(`
-      SELECT id, label, days FROM payment_terms
-      WHERE is_active = 1 AND id IN (${placeholders})
-      ORDER BY position, id
-    `).all(...allowedIds)
-  } else {
-    rows = db.prepare(`
-      SELECT id, label, days FROM payment_terms
-      WHERE is_active = 1 ORDER BY position, id
-    `).all()
-  }
-
+  const rows = allowedTermsForCustomer(req.customer).map(t => ({ ...t, methods: methodsForTerm(t.days) }))
   res.json({ payment_terms: rows })
 })
 

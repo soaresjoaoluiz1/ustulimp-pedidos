@@ -94,7 +94,7 @@ function exportCsv(req, res) {
   }
 
   const today = new Date().toISOString().slice(0, 10)
-  const filename = `pedidos-oxi-${today}.csv`
+  const filename = `pedidos-ustulimp-${today}.csv`
 
   /* BOM UTF-8 pra Excel reconhecer acentos */
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')

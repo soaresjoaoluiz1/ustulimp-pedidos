@@ -19,7 +19,7 @@ router.get('/', requireAuth, requireCustomer, (req, res) => {
     return res.status(400).json({ error: 'Cliente sem tabela de preço vinculada. Contate o admin.' })
   }
 
-  const where = ['p.is_active = 1', 'pti.is_active = 1', 'pti.price_table_id = ?']
+  const where = ['p.is_active = 1', 'pti.is_active = 1', 'pt.is_active = 1', 'pti.price_table_id = ?']
   const params = [req.customer.price_table_id]
   if (category_id) { where.push('p.category_id = ?'); params.push(category_id) }
   if (search) {
@@ -36,6 +36,7 @@ router.get('/', requireAuth, requireCustomer, (req, res) => {
       c.id AS category_id, c.name AS category_name, c.slug AS category_slug, c.icon AS category_icon
     FROM products p
     JOIN price_table_items pti ON pti.product_id = p.id
+    JOIN price_tables pt ON pt.id = pti.price_table_id
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE ${where.join(' AND ')}
     ORDER BY c.position, p.name
