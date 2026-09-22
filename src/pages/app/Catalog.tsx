@@ -271,7 +271,8 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
 
 function ProductDetailContent({ variants }: { variants: CatalogProduct[] }) {
   const { addItem, getQty } = useCart()
-  const [selIdx, setSelIdx] = useState(0)
+  // abre na primeira embalagem que tem foto (ex: só o 5L tem foto → card abre no 5L)
+  const [selIdx, setSelIdx] = useState(() => Math.max(0, variants.findIndex(v => v.image_url)))
   const product = variants[selIdx] || variants[0]
   const nome = baseName(product.name)
   const inCart = getQty(product.id)

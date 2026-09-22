@@ -3,7 +3,8 @@
  * 29 SKUs. Venda POR CAIXA: box_price = preço da caixa (vai pra tabela de preço),
  * units_per_box = unidades por caixa (6 un. de 2L ou 4 un. de 5L), unit_price = só referência.
  * peso_kg = estimativa (litros × 1,05) pro resumo de transporte.
- * image_url: preencher com /pedidos/products/<arquivo> quando as fotos chegarem.
+ * image_url: /pedidos/products/<sku>.webp (fotos em public/products). Sem foto = null.
+ * Atualizar fotos em produção sem apagar nada: npm run seed:images
  */
 
 export const PRODUCTS = [
@@ -19,7 +20,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/001.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -35,7 +36,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/002.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -67,7 +68,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/004.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -147,7 +148,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/009.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -179,7 +180,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/011.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -195,7 +196,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/012.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -211,7 +212,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/013.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -227,7 +228,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/014.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -243,7 +244,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/015.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -259,7 +260,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/016.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -275,7 +276,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/017.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -291,7 +292,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/018.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -307,7 +308,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/019.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -323,7 +324,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/020.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -355,7 +356,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/022.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -403,7 +404,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/025.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -419,7 +420,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/026.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   },
@@ -451,7 +452,7 @@ export const PRODUCTS = [
       "2L",
       "Cx 6 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/028.webp",
     "peso_kg": 12.6,
     "volume_m3": 0
   },
@@ -467,7 +468,7 @@ export const PRODUCTS = [
       "5L",
       "Cx 4 un."
     ],
-    "image_url": null,
+    "image_url": "/pedidos/products/029.webp",
     "peso_kg": 21.0,
     "volume_m3": 0
   }

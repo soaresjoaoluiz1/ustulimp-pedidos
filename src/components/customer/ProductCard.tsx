@@ -26,7 +26,8 @@ export interface ProductCardData {
 /** Card de produto com seletor de embalagem (variantes: 1L / 5L / 20L…). */
 export default function ProductCard({ variants, onDetails }: { variants: ProductCardData[]; onDetails?: () => void }) {
   const { getQty, addItem, updateQty } = useCart()
-  const [selIdx, setSelIdx] = useState(0)
+  // abre na primeira embalagem que tem foto (ex: só o 5L tem foto → card abre no 5L)
+  const [selIdx, setSelIdx] = useState(() => Math.max(0, variants.findIndex(v => v.image_url)))
   const [localQty, setLocalQty] = useState(1)
   const [justAdded, setJustAdded] = useState(false)
 
