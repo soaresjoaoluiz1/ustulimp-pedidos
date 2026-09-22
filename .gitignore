@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# DB local — NUNCA commitar (cada ambiente tem seu próprio)
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+
+# Uploads (cada ambiente tem seus próprios)
+server/data/uploads/
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode
+.idea
+
+# IMPORTANTE: dist/ É commitada (build local, VPS não builda)
+# Backups locais
+backups/
