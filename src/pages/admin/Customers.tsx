@@ -1,10 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus, Pencil, Search, Users, KeyRound, Copy } from 'lucide-react'
+import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
 import { Card, Button, Input, Select, Modal, Badge, Textarea, EmptyState, toast } from '@/components/ui'
 import { PageHeader } from '@/components/admin/AdminLayout'
 import { fmtBRL, fmtRelative } from '@/lib/format'
 import { COMPANY } from '@/lib/company'
+
+/** 00.000.000/0000-00 enquanto digita */
+function fmtCnpj(v: string) {
+  const d = v.replace(/\D/g, '').slice(0, 14)
+  return d
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2')
+}
 
 interface Customer {
   id: number
@@ -196,6 +207,44 @@ function CustomerModal({ customer, priceTables, paymentTerms, onClose, onSaved }
   const [allTermsAllowed, setAllTermsAllowed] = useState<boolean>(initialAllowed === null)
   const [allowedTermIds, setAllowedTermIds] = useState<number[]>(Array.isArray(initialAllowed) ? initialAllowed : [])
   const [saving, setSaving] = useState(false)
+  const [lookingUp, setLookingUp] = useState(false)
+  const [cnpjInfo, setCnpjInfo] = useState<{ status?: string; active?: boolean; main_activity?: string } | null>(null)
+  const lastLookup = useRef('')
+
+  /* Puxa os dados da empresa na Receita pelo CNPJ e preenche o formulário.
+     Campo que o admin já digitou não é sobrescrito (só com o botão "Buscar"). */
+  async function lookupCnpj(raw: string, { force = false } = {}) {
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length !== 14) {
+      if (force) toast.error('Digite os 14 números do CNPJ')
+      return
+    }
+    if (!force && lastLookup.current === digits) return
+    lastLookup.current = digits
+    setLookingUp(true)
+    try {
+      const d = await api.get<any>(`/admin/cnpj/${digits}`)
+      setForm(f => ({
+        ...f,
+        document: fmtCnpj(digits),
+        document_type: 'cnpj',
+        company_name: force || !f.company_name ? (d.company_name || f.company_name) : f.company_name,
+        name: f.name || d.contact_suggestion || '',
+        address: force || !f.address ? (d.address || f.address) : f.address,
+        city: force || !f.city ? (d.city || f.city) : f.city,
+        state: force || !f.state ? (d.state || f.state) : f.state,
+        zip_code: force || !f.zip_code ? (d.zip_code || f.zip_code) : f.zip_code,
+        phone: force || !f.phone ? (d.phone || f.phone) : f.phone,
+        whatsapp: f.whatsapp || d.phone || '',
+        email: f.email || d.email || '',
+      }))
+      setCnpjInfo({ status: d.status, active: d.active, main_activity: d.main_activity })
+      toast.success(d.active ? 'Dados da empresa preenchidos' : `Empresa encontrada, mas a situação é "${d.status}"`)
+    } catch (err: any) {
+      setCnpjInfo(null)
+      toast.error(err.message || 'Não foi possível consultar o CNPJ')
+    } finally { setLookingUp(false) }
+  }
 
   function toggleTerm(id: number) {
     setAllowedTermIds(ids => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])
@@ -268,7 +317,29 @@ function CustomerModal({ customer, priceTables, paymentTerms, onClose, onSaved }
             <option value="cnpj">CNPJ</option>
             <option value="cpf">CPF</option>
           </Select>
-          <Input label="Documento" value={form.document} onChange={e => update('document', e.target.value)} className="col-span-2" />
+          <div className="col-span-2">
+            <div className="flex items-end gap-2">
+              <Input
+                label={form.document_type === 'cnpj' ? 'CNPJ (busca os dados sozinho)' : 'CPF'}
+                value={form.document}
+                onChange={e => update('document', form.document_type === 'cnpj' ? fmtCnpj(e.target.value) : e.target.value)}
+                onBlur={e => form.document_type === 'cnpj' && lookupCnpj(e.target.value)}
+                placeholder={form.document_type === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                className="flex-1"
+              />
+              {form.document_type === 'cnpj' && (
+                <Button type="button" variant="secondary" onClick={() => lookupCnpj(form.document, { force: true })} loading={lookingUp} className="h-10 whitespace-nowrap">
+                  <Search className="w-4 h-4" /> Buscar
+                </Button>
+              )}
+            </div>
+            {cnpjInfo && (
+              <div className={cn('text-[11px] mt-1', cnpjInfo.active ? 'text-emerald-600' : 'text-amber-600')}>
+                {cnpjInfo.active ? '✓ Ativa na Receita' : `⚠ Situação: ${cnpjInfo.status}`}
+                {cnpjInfo.main_activity ? ` · ${cnpjInfo.main_activity}` : ''}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

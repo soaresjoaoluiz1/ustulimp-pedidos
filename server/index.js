@@ -18,6 +18,7 @@ import adminOrdersRoutes from './routes/admin/orders.js'
 import adminPaymentTermsRoutes from './routes/admin/payment-terms.js'
 import adminDashboardRoutes from './routes/admin/dashboard.js'
 import adminUploadRoutes, { UPLOADS_DIR } from './routes/admin/upload.js'
+import adminCnpjRoutes from './routes/admin/cnpj.js'
 
 import { requireAuth, requireAdmin } from './middleware/auth.js'
 
@@ -97,6 +98,7 @@ app.use('/api/admin/orders', adminOrdersRoutes)
 app.use('/api/admin/payment-terms', adminPaymentTermsRoutes)
 app.use('/api/admin/dashboard', adminDashboardRoutes)
 app.use('/api/admin/upload', adminUploadRoutes)
+app.use('/api/admin/cnpj', adminCnpjRoutes)
 
 /* ── Serve uploads (público pra exibir imagens dos produtos) ── */
 app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d', immutable: true }))
