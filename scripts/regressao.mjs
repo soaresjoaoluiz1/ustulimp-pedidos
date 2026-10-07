@@ -26,7 +26,11 @@ const CT = cli.data.token
 
 console.log('\n— login e pedido mínimo')
 check('login do cliente traz o mínimo efetivo', cli.data.customer?.effective_minimum_order_value === 1200, cli.data.customer)
-check('login traz o nome da tabela', cli.data.customer?.price_table_name === 'Padrão')
+const TABELA_ID = cli.data.customer?.price_table_id
+const TABELA_NOME = cli.data.customer?.price_table_name
+check('login traz o nome da tabela', !!TABELA_NOME, cli.data.customer)
+const PRODUTOS_NA_TABELA = (await call('/catalog', { token: CT })).data.products.length
+check('catálogo do cliente tem produtos', PRODUTOS_NA_TABELA > 0)
 
 const item = (q) => ({ items: [{ product_id: 20, quantity: q }], payment_term: 'Boleto 28 dias', payment_method: 'boleto' })
 check('abaixo do mínimo é recusado', (await call('/orders', { method: 'POST', token: CT, body: item(10) })).data?.code === 'MIN_ORDER_NOT_MET')
@@ -53,9 +57,9 @@ check('detalhe do cliente traz os dados dele (PDF)', !!det.data?.order?.customer
 check('items_count do banco bate com o detalhe', det.data?.order?.items_count === 2)
 
 console.log('\n— preço em massa')
-check('preço negativo recusado', (await call('/price-tables/1/items', { method: 'PUT', token: AT, body: { items: [{ product_id: 20, price: -50 }] } })).status === 404 || (await call('/admin/price-tables/1/items', { method: 'PUT', token: AT, body: { items: [{ product_id: 20, price: -50 }] } })).status === 400)
-check('preço texto recusado', (await call('/admin/price-tables/1/items', { method: 'PUT', token: AT, body: { items: [{ product_id: 20, price: 'abc' }] } })).status === 400)
-check('produto inexistente recusado', (await call('/admin/price-tables/1/items', { method: 'PUT', token: AT, body: { items: [{ product_id: 99999, price: 10 }] } })).status === 400)
+check('preço negativo recusado', (await call(`/price-tables/${TABELA_ID}/items`, { method: 'PUT', token: AT, body: { items: [{ product_id: 20, price: -50 }] } })).status === 404 || (await call(`/admin/price-tables/${TABELA_ID}/items`, { method: 'PUT', token: AT, body: { items: [{ product_id: 20, price: -50 }] } })).status === 400)
+check('preço texto recusado', (await call(`/admin/price-tables/${TABELA_ID}/items`, { method: 'PUT', token: AT, body: { items: [{ product_id: 20, price: 'abc' }] } })).status === 400)
+check('produto inexistente recusado', (await call(`/admin/price-tables/${TABELA_ID}/items`, { method: 'PUT', token: AT, body: { items: [{ product_id: 99999, price: 10 }] } })).status === 400)
 
 console.log('\n— update parcial (limpar campo)')
 await call('/admin/products/1', { method: 'PUT', token: AT, body: { short_use: 'texto qualquer' } })
@@ -65,11 +69,11 @@ check('campo limpo fica vazio mesmo', p1.short_use === null, p1.short_use)
 check('outros campos não foram apagados', !!p1.name && !!p1.sku)
 
 console.log('\n— tabela de preço inativa')
-await call('/admin/price-tables/1', { method: 'PUT', token: AT, body: { is_active: false } })
+await call(`/admin/price-tables/${TABELA_ID}`, { method: 'PUT', token: AT, body: { is_active: false } })
 check('catálogo bloqueia tabela inativa', (await call('/catalog', { token: CT })).data.products.length === 0)
 check('pedido em tabela inativa recusado', (await call('/orders', { method: 'POST', token: CT, body: item(20) })).status === 400)
-await call('/admin/price-tables/1', { method: 'PUT', token: AT, body: { is_active: true } })
-check('reativando, catálogo volta', (await call('/catalog', { token: CT })).data.products.length === 29)
+await call(`/admin/price-tables/${TABELA_ID}`, { method: 'PUT', token: AT, body: { is_active: true } })
+check('reativando, catálogo volta', (await call('/catalog', { token: CT })).data.products.length === PRODUTOS_NA_TABELA)
 
 console.log('\n— senha e sessão')
 const reset = await call('/admin/customers/1/reset-password', { method: 'POST', token: AT })

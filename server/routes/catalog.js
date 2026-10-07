@@ -31,7 +31,8 @@ router.get('/', requireAuth, requireCustomer, (req, res) => {
   const rows = db.prepare(`
     SELECT
       p.id, p.sku, p.name, p.short_use, p.description, p.unit, p.image_url,
-      p.market_price, p.suggested_sale_price, p.units_per_box, p.peso_kg, p.volume_m3, p.tags, p.featured,
+      p.market_price, p.units_per_box,
+      CASE WHEN pt.show_suggested_sale = 1 THEN p.suggested_sale_price END AS suggested_sale_price, p.peso_kg, p.volume_m3, p.tags, p.featured,
       pti.price,
       c.id AS category_id, c.name AS category_name, c.slug AS category_slug, c.icon AS category_icon
     FROM products p

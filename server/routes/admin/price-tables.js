@@ -94,14 +94,14 @@ router.put('/:id/items', (req, res) => {
 })
 
 router.post('/', (req, res) => {
-  const { name, description, distance_min_km, distance_max_km, minimum_order_value } = req.body
+  const { name, description, distance_min_km, distance_max_km, minimum_order_value, show_suggested_sale } = req.body
   if (!name) return res.status(400).json({ error: 'Nome é obrigatório' })
   const slug = slugify(name)
   try {
     const r = db.prepare(`
-      INSERT INTO price_tables (name, slug, description, distance_min_km, distance_max_km, minimum_order_value)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, slug, description || null, distance_min_km ?? null, distance_max_km ?? null, minimum_order_value || 0)
+      INSERT INTO price_tables (name, slug, description, distance_min_km, distance_max_km, minimum_order_value, show_suggested_sale)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(name, slug, description || null, distance_min_km ?? null, distance_max_km ?? null, minimum_order_value || 0, show_suggested_sale ? 1 : 0)
     res.status(201).json({ id: r.lastInsertRowid, slug })
   } catch (err) {
     if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') return res.status(409).json({ error: 'Já existe tabela com esse nome' })
@@ -122,12 +122,14 @@ router.put('/:id', (req, res) => {
       distance_min_km = COALESCE(?, distance_min_km),
       distance_max_km = COALESCE(?, distance_max_km),
       minimum_order_value = COALESCE(?, minimum_order_value),
-      is_active = COALESCE(?, is_active)
+      is_active = COALESCE(?, is_active),
+      show_suggested_sale = COALESCE(?, show_suggested_sale)
     WHERE id = ?
   `).run(b.name ?? null, newSlug, b.description ?? null,
          b.distance_min_km ?? null, b.distance_max_km ?? null,
          b.minimum_order_value ?? null,
          b.is_active === undefined ? null : (b.is_active ? 1 : 0),
+         b.show_suggested_sale === undefined ? null : (b.show_suggested_sale ? 1 : 0),
          req.params.id)
   res.json({ ok: true })
 })

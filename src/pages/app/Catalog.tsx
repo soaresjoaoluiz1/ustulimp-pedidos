@@ -9,7 +9,7 @@ import CartSidebar from '@/components/customer/CartSidebar'
 import ProductCard, { ProductCardData } from '@/components/customer/ProductCard'
 import { fmtBRL } from '@/lib/format'
 import { cn } from '@/lib/cn'
-import { boxInfo, baseName, packLabel } from '@/lib/pricing'
+import { boxInfo, resaleInfo, baseName, packLabel } from '@/lib/pricing'
 import { CategoryIcon } from '@/lib/categoryIcons'
 
 interface Category {
@@ -324,8 +324,9 @@ function ProductDetailContent({ variants }: { variants: CatalogProduct[] }) {
 
       {(() => {
         const box = boxInfo(product.price, product.units_per_box)
+        const revenda = resaleInfo(product.price, product.suggested_sale_price, product.units_per_box)
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm bg-blue-50 rounded-xl p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm bg-blue-50 rounded-xl p-4">
             <div>
               <div className="text-xs text-slate-500">{box.label ? `Caixa (${box.units} un.)` : 'Preço'}</div>
               <div className="font-display text-2xl font-extrabold text-emerald-600 tabular-nums">{fmtBRL(product.price)}</div>
@@ -336,10 +337,18 @@ function ProductDetailContent({ variants }: { variants: CatalogProduct[] }) {
                 <div className="font-display text-lg font-bold text-navy-700 tabular-nums">{fmtBRL(box.perUnit)}</div>
               </div>
             )}
-            {product.suggested_sale_price && (
+            {revenda.perUnit != null && (
               <div>
-                <div className="text-xs text-slate-500">Revenda sugerida</div>
-                <div className="font-display text-lg font-bold text-navy-700 tabular-nums">{fmtBRL(product.suggested_sale_price)}</div>
+                <div className="text-xs text-slate-500">Revenda sugerida / un.</div>
+                <div className="font-display text-lg font-bold text-navy-700 tabular-nums">{fmtBRL(revenda.perUnit)}</div>
+              </div>
+            )}
+            {revenda.profit != null && revenda.profit > 0 && (
+              <div>
+                <div className="text-xs text-slate-500">Lucro por caixa</div>
+                <div className="font-display text-lg font-bold text-emerald-600 tabular-nums">
+                  {fmtBRL(revenda.profit)}{revenda.profitPct != null && <span className="text-xs font-semibold"> · {revenda.profitPct}%</span>}
+                </div>
               </div>
             )}
           </div>

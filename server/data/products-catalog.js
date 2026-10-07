@@ -1,10 +1,13 @@
 /**
- * Catálogo Ustulimp — Tabela de Preços set/2026 (pedido mínimo R$ 500,00).
- * 29 SKUs. Venda POR CAIXA: box_price = preço da caixa (vai pra tabela de preço),
- * units_per_box = unidades por caixa (6 un. de 2L ou 4 un. de 5L), unit_price = só referência.
- * peso_kg = estimativa (litros × 1,05) pro resumo de transporte.
- * image_url: /pedidos/products/<sku>.webp (fotos em public/products). Sem foto = null.
- * Atualizar fotos em produção sem apagar nada: npm run seed:images
+ * Catálogo Ustulimp — tabelas de out/2026 (as duas tabelas oficiais impressas).
+ * 30 SKUs. Venda POR CAIXA.
+ *
+ *   prices["revenda"]          = preço da CAIXA pro revendedor (pedido mínimo R$ 1.500)
+ *   prices["consumidor-final"] = preço da CAIXA pro cliente final (sem pedido mínimo)
+ *   null = produto não é vendido naquela tabela (não aparece pro cliente dela)
+ *   suggested_sale_price       = revenda sugerida POR UNIDADE, com 60% de lucro
+ *   units_per_box              = unidades na caixa (6 un. de 2L ou 4 un. de 5L)
+ *   peso_kg = estimativa (litros × 1,05) pro resumo de transporte
  */
 
 export const PRODUCTS = [
@@ -13,8 +16,11 @@ export const PRODUCTS = [
     "name": "Água Sanitária 2L",
     "category": "Água Sanitária e Alvejante",
     "units_per_box": 6,
-    "box_price": 24.0,
-    "unit_price": 4.0,
+    "prices": {
+      "revenda": 24.0,
+      "consumidor-final": 33.6
+    },
+    "suggested_sale_price": 6.4,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -29,8 +35,11 @@ export const PRODUCTS = [
     "name": "Água Sanitária 5L",
     "category": "Água Sanitária e Alvejante",
     "units_per_box": 4,
-    "box_price": 32.0,
-    "unit_price": 8.0,
+    "prices": {
+      "revenda": 32.0,
+      "consumidor-final": 39.6
+    },
+    "suggested_sale_price": 12.8,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -45,8 +54,11 @@ export const PRODUCTS = [
     "name": "Alvejante sem Cloro 2L",
     "category": "Água Sanitária e Alvejante",
     "units_per_box": 6,
-    "box_price": 41.4,
-    "unit_price": 6.9,
+    "prices": {
+      "revenda": 41.4,
+      "consumidor-final": 69.6
+    },
+    "suggested_sale_price": 11.04,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -61,8 +73,11 @@ export const PRODUCTS = [
     "name": "Amaciante Azul 2L",
     "category": "Amaciantes",
     "units_per_box": 6,
-    "box_price": 32.4,
-    "unit_price": 5.4,
+    "prices": {
+      "revenda": 32.4,
+      "consumidor-final": 53.4
+    },
+    "suggested_sale_price": 8.64,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -77,8 +92,11 @@ export const PRODUCTS = [
     "name": "Amaciante Azul 5L",
     "category": "Amaciantes",
     "units_per_box": 4,
-    "box_price": 49.6,
-    "unit_price": 12.4,
+    "prices": {
+      "revenda": 49.6,
+      "consumidor-final": 71.6
+    },
+    "suggested_sale_price": 19.84,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -93,8 +111,11 @@ export const PRODUCTS = [
     "name": "Amaciante Chá Branco 5L",
     "category": "Amaciantes",
     "units_per_box": 4,
-    "box_price": 55.6,
-    "unit_price": 13.9,
+    "prices": {
+      "revenda": 55.6,
+      "consumidor-final": 75.6
+    },
+    "suggested_sale_price": 22.24,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -109,8 +130,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Algas Marinhas 2L",
     "category": "Desinfetantes",
     "units_per_box": 6,
-    "box_price": 23.4,
-    "unit_price": 3.9,
+    "prices": {
+      "revenda": 23.4,
+      "consumidor-final": 35.4
+    },
+    "suggested_sale_price": 6.24,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -125,8 +149,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Lavanda 2L",
     "category": "Desinfetantes",
     "units_per_box": 6,
-    "box_price": 23.4,
-    "unit_price": 3.9,
+    "prices": {
+      "revenda": 23.4,
+      "consumidor-final": 35.4
+    },
+    "suggested_sale_price": 6.24,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -141,8 +168,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Brisa Algodão 2L",
     "category": "Desinfetantes",
     "units_per_box": 6,
-    "box_price": 23.4,
-    "unit_price": 3.9,
+    "prices": {
+      "revenda": 23.4,
+      "consumidor-final": 35.4
+    },
+    "suggested_sale_price": 6.24,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -157,8 +187,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Flor de Cerejeira 2L",
     "category": "Desinfetantes",
     "units_per_box": 6,
-    "box_price": 23.4,
-    "unit_price": 3.9,
+    "prices": {
+      "revenda": 23.4,
+      "consumidor-final": 35.4
+    },
+    "suggested_sale_price": 6.24,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -173,8 +206,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Pinho 2L",
     "category": "Desinfetantes",
     "units_per_box": 6,
-    "box_price": 23.4,
-    "unit_price": 3.9,
+    "prices": {
+      "revenda": 23.4,
+      "consumidor-final": 35.4
+    },
+    "suggested_sale_price": 6.24,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -189,8 +225,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Algas Marinhas 5L",
     "category": "Desinfetantes",
     "units_per_box": 4,
-    "box_price": 33.6,
-    "unit_price": 8.4,
+    "prices": {
+      "revenda": 33.6,
+      "consumidor-final": 47.6
+    },
+    "suggested_sale_price": 13.44,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -205,8 +244,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Lavanda 5L",
     "category": "Desinfetantes",
     "units_per_box": 4,
-    "box_price": 33.6,
-    "unit_price": 8.4,
+    "prices": {
+      "revenda": 33.6,
+      "consumidor-final": 47.6
+    },
+    "suggested_sale_price": 13.44,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -221,8 +263,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Brisa Algodão 5L",
     "category": "Desinfetantes",
     "units_per_box": 4,
-    "box_price": 33.6,
-    "unit_price": 8.4,
+    "prices": {
+      "revenda": 33.6,
+      "consumidor-final": 47.6
+    },
+    "suggested_sale_price": 13.44,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -237,8 +282,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Flor de Cerejeira 5L",
     "category": "Desinfetantes",
     "units_per_box": 4,
-    "box_price": 33.6,
-    "unit_price": 8.4,
+    "prices": {
+      "revenda": 33.6,
+      "consumidor-final": 47.6
+    },
+    "suggested_sale_price": 13.44,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -253,8 +301,11 @@ export const PRODUCTS = [
     "name": "Desinfetante Pinho 5L",
     "category": "Desinfetantes",
     "units_per_box": 4,
-    "box_price": 33.6,
-    "unit_price": 8.4,
+    "prices": {
+      "revenda": 33.6,
+      "consumidor-final": 47.6
+    },
+    "suggested_sale_price": 13.44,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -269,8 +320,11 @@ export const PRODUCTS = [
     "name": "Detergente Neutro 2L",
     "category": "Detergentes",
     "units_per_box": 6,
-    "box_price": 34.2,
-    "unit_price": 5.7,
+    "prices": {
+      "revenda": 34.2,
+      "consumidor-final": 41.7
+    },
+    "suggested_sale_price": 9.12,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -285,8 +339,11 @@ export const PRODUCTS = [
     "name": "Detergente Neutro 5L",
     "category": "Detergentes",
     "units_per_box": 4,
-    "box_price": 51.6,
-    "unit_price": 12.9,
+    "prices": {
+      "revenda": 51.6,
+      "consumidor-final": 63.6
+    },
+    "suggested_sale_price": 20.64,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -301,8 +358,11 @@ export const PRODUCTS = [
     "name": "Lava Roupas 2L",
     "category": "Lava Roupas",
     "units_per_box": 6,
-    "box_price": 50.4,
-    "unit_price": 8.4,
+    "prices": {
+      "revenda": 50.4,
+      "consumidor-final": 83.4
+    },
+    "suggested_sale_price": 13.44,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -317,8 +377,11 @@ export const PRODUCTS = [
     "name": "Lava Roupas 5L",
     "category": "Lava Roupas",
     "units_per_box": 4,
-    "box_price": 83.6,
-    "unit_price": 20.9,
+    "prices": {
+      "revenda": 83.6,
+      "consumidor-final": 107.6
+    },
+    "suggested_sale_price": 33.44,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -333,8 +396,11 @@ export const PRODUCTS = [
     "name": "Lava Roupas Orquídea Negra 5L",
     "category": "Lava Roupas",
     "units_per_box": 4,
-    "box_price": 87.6,
-    "unit_price": 21.9,
+    "prices": {
+      "revenda": 87.6,
+      "consumidor-final": 111.6
+    },
+    "suggested_sale_price": 35.04,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -349,8 +415,11 @@ export const PRODUCTS = [
     "name": "Limpador Perfumado Talco 2L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 6,
-    "box_price": 47.4,
-    "unit_price": 7.9,
+    "prices": {
+      "revenda": 47.4,
+      "consumidor-final": 83.4
+    },
+    "suggested_sale_price": 12.64,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -365,8 +434,11 @@ export const PRODUCTS = [
     "name": "Limpador Perfumado Bamboo 2L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 6,
-    "box_price": 47.4,
-    "unit_price": 7.9,
+    "prices": {
+      "revenda": 47.4,
+      "consumidor-final": 83.4
+    },
+    "suggested_sale_price": 12.64,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -381,8 +453,11 @@ export const PRODUCTS = [
     "name": "Limpador Perfumado Flor de Laranjeira 2L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 6,
-    "box_price": 47.4,
-    "unit_price": 7.9,
+    "prices": {
+      "revenda": 47.4,
+      "consumidor-final": 83.4
+    },
+    "suggested_sale_price": 12.64,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -397,8 +472,11 @@ export const PRODUCTS = [
     "name": "Limpador Perfumado Lavanda 2L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 6,
-    "box_price": 47.4,
-    "unit_price": 7.9,
+    "prices": {
+      "revenda": 47.4,
+      "consumidor-final": 83.4
+    },
+    "suggested_sale_price": 12.64,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -413,8 +491,11 @@ export const PRODUCTS = [
     "name": "Limpador Perfumado Lavanda 5L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 4,
-    "box_price": 67.6,
-    "unit_price": 16.9,
+    "prices": {
+      "revenda": 67.6,
+      "consumidor-final": 103.6
+    },
+    "suggested_sale_price": 27.04,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
@@ -429,8 +510,11 @@ export const PRODUCTS = [
     "name": "Multiuso 2L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 6,
-    "box_price": 35.4,
-    "unit_price": 5.9,
+    "prices": {
+      "revenda": 35.4,
+      "consumidor-final": 47.4
+    },
+    "suggested_sale_price": 9.44,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -445,8 +529,11 @@ export const PRODUCTS = [
     "name": "Limpador Concentrado Gel 2L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 6,
-    "box_price": 50.4,
-    "unit_price": 8.4,
+    "prices": {
+      "revenda": 50.4,
+      "consumidor-final": 83.4
+    },
+    "suggested_sale_price": 13.44,
     "short_use": "Caixa com 6 un. de 2L",
     "tags": [
       "2L",
@@ -461,14 +548,36 @@ export const PRODUCTS = [
     "name": "Limpador Concentrado Gel 5L",
     "category": "Limpadores e Multiuso",
     "units_per_box": 4,
-    "box_price": 83.6,
-    "unit_price": 20.9,
+    "prices": {
+      "revenda": 83.6,
+      "consumidor-final": 107.6
+    },
+    "suggested_sale_price": 33.44,
     "short_use": "Caixa com 4 un. de 5L",
     "tags": [
       "5L",
       "Cx 4 un."
     ],
     "image_url": "/pedidos/products/029.webp",
+    "peso_kg": 21.0,
+    "volume_m3": 0
+  },
+  {
+    "sku": "030",
+    "name": "Multiuso Flotador 5L",
+    "category": "Limpadores e Multiuso",
+    "units_per_box": 4,
+    "prices": {
+      "revenda": null,
+      "consumidor-final": 83.6
+    },
+    "suggested_sale_price": null,
+    "short_use": "Caixa com 4 un. de 5L",
+    "tags": [
+      "5L",
+      "Cx 4 un."
+    ],
+    "image_url": null,
     "peso_kg": 21.0,
     "volume_m3": 0
   }
@@ -514,7 +623,8 @@ export const CATEGORIES = [
 ]
 
 export const PRICE_TABLES = [
-  { name: 'Padrão', slug: 'padrao', description: 'Tabela set/2026 · pedido mínimo R$ 500,00', distance_min_km: null, distance_max_km: null, minimum_order_value: 500 },
+  { name: 'Revenda', slug: 'revenda', description: 'Revendedores · pedido mínimo R$ 1.500,00', distance_min_km: null, distance_max_km: null, minimum_order_value: 1500, show_suggested_sale: true },
+  { name: 'Consumidor final', slug: 'consumidor-final', description: 'Venda direta ao consumidor · sem pedido mínimo', distance_min_km: null, distance_max_km: null, minimum_order_value: 0, show_suggested_sale: false },
 ]
 
 export const PAYMENT_TERMS = [

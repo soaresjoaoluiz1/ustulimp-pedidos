@@ -28,3 +28,17 @@ export function boxInfo(price?: number, unitsPerBox?: number | null) {
     label: n ? `Cx c/ ${n} un.` : null,
   }
 }
+
+/** Revenda sugerida vem POR UNIDADE; o preço é da CAIXA. Lucro = (sugerida × un.) − preço da caixa. */
+export function resaleInfo(price?: number, suggestedPerUnit?: number | null, unitsPerBox?: number | null) {
+  if (!suggestedPerUnit || !price) return { perUnit: null, perBox: null, profit: null, profitPct: null }
+  const units = unitsPerBox && unitsPerBox > 0 ? unitsPerBox : 1
+  const perBox = suggestedPerUnit * units
+  const profit = perBox - price
+  return {
+    perUnit: suggestedPerUnit,
+    perBox,
+    profit,
+    profitPct: price > 0 ? Math.round((profit / price) * 100) : null,
+  }
+}

@@ -3,7 +3,7 @@ import { ShoppingCart, Plus, Minus, Check } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { fmtBRL } from '@/lib/format'
 import { cn } from '@/lib/cn'
-import { boxInfo, baseName, packLabel } from '@/lib/pricing'
+import { boxInfo, resaleInfo, baseName, packLabel } from '@/lib/pricing'
 
 export interface ProductCardData {
   id: number
@@ -35,6 +35,7 @@ export default function ProductCard({ variants, onDetails }: { variants: Product
   const nome = baseName(product.name)
   const inCart = getQty(product.id)
   const box = boxInfo(product.price, product.units_per_box)
+  const revenda = resaleInfo(product.price, product.suggested_sale_price, product.units_per_box)
 
   function handleAdd() {
     addItem({
@@ -126,9 +127,18 @@ export default function ProductCard({ variants, onDetails }: { variants: Product
               Unidade <b className="text-navy-700 tabular-nums">{fmtBRL(box.perUnit)}</b>
             </div>
           )}
-          {product.suggested_sale_price ? (
-            <div className="text-[11px] text-slate-500">Revende <b className="text-navy-700 tabular-nums">{fmtBRL(product.suggested_sale_price)}</b></div>
-          ) : null}
+          {revenda.perUnit != null && (
+            <div className="pt-1.5 border-t border-slate-100">
+              <div className="text-[11px] text-slate-500">
+                Revende por <b className="text-navy-700 tabular-nums">{fmtBRL(revenda.perUnit)}</b>/un.
+              </div>
+              {revenda.profit != null && revenda.profit > 0 && (
+                <div className="text-[11px] font-bold text-emerald-600 tabular-nums">
+                  Lucro {fmtBRL(revenda.profit)}/cx{revenda.profitPct != null && ` · ${revenda.profitPct}%`}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Stepper + adicionar */}

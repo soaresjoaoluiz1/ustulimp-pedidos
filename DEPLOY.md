@@ -79,6 +79,14 @@ depois Setup Node.js App → **Restart**.
 > Nova dependência npm → também clicar em **Run NPM Install** antes do Restart.
 > ⚠️ **Nunca** rodar `npm run seed:reset` em produção depois do go-live (apaga pedidos e clientes).
 
+## Mudança de tabela de preços
+As tabelas ficam em `server/data/products-catalog.js` (`PRICE_TABLES` + `prices` de cada produto).
+Depois de editar: build + push + Update from Remote e, no cPanel → Node.js → **Correr script JS → `tabelas`**
+(ou no Terminal: `source ~/nodevenv/ustulimp-pedidos/18/bin/activate && cd ~/ustulimp-pedidos && npm run tabelas`).
+
+`npm run tabelas` é seguro em produção: cria/atualiza tabelas e preços, cria produto novo pelo SKU,
+move os clientes da tabela antiga pra nova e desativa a antiga. **Não** apaga pedidos, clientes nem fotos.
+
 ## Fotos dos produtos
 Arquivos em `public/products/` → entram no build → URL `/pedidos/products/<arquivo>`.
 O `image_url` de cada produto fica no catálogo (`server/data/products-catalog.js`, por SKU).

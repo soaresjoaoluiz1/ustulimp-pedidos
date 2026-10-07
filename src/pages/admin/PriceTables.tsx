@@ -123,7 +123,8 @@ function PriceTableModal({ table, onClose, onSaved }: { table: PriceTable | null
     description: table?.description || '',
     distance_min_km: table?.distance_min_km?.toString() || '',
     distance_max_km: table?.distance_max_km?.toString() || '',
-    minimum_order_value: table?.minimum_order_value?.toString() || '0'
+    minimum_order_value: table?.minimum_order_value?.toString() || '0',
+    show_suggested_sale: !!(table as any)?.show_suggested_sale
   })
   const [saving, setSaving] = useState(false)
 
@@ -136,7 +137,8 @@ function PriceTableModal({ table, onClose, onSaved }: { table: PriceTable | null
         description: form.description || null,
         distance_min_km: form.distance_min_km ? Number(form.distance_min_km) : null,
         distance_max_km: form.distance_max_km ? Number(form.distance_max_km) : null,
-        minimum_order_value: Number(form.minimum_order_value) || 0
+        minimum_order_value: Number(form.minimum_order_value) || 0,
+        show_suggested_sale: form.show_suggested_sale
       }
       if (table) {
         await api.put(`/admin/price-tables/${table.id}`, payload)
@@ -159,6 +161,13 @@ function PriceTableModal({ table, onClose, onSaved }: { table: PriceTable | null
           <Input label="Distância máx. (km)" type="number" value={form.distance_max_km} onChange={e => setForm({ ...form, distance_max_km: e.target.value })} placeholder="100" />
         </div>
         <Input label="Pedido mínimo (R$)" type="number" step="0.01" value={form.minimum_order_value} onChange={e => setForm({ ...form, minimum_order_value: e.target.value })} hint="0 = sem mínimo" />
+        <label className="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
+          <input type="checkbox" checked={form.show_suggested_sale} onChange={e => setForm({ ...form, show_suggested_sale: e.target.checked })} className="mt-0.5" />
+          <span>
+            Mostrar sugestão de revenda no catálogo
+            <span className="block text-xs text-slate-500">Marque só em tabela de revendedor. O cliente final não deve ver "revende por".</span>
+          </span>
+        </label>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
           <Button onClick={save} loading={saving}>{table ? 'Salvar' : 'Criar'}</Button>

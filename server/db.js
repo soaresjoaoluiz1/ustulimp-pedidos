@@ -212,6 +212,7 @@ function ensureColumn(table, column, definition) {
 }
 
 ensureColumn('products', 'suggested_sale_price', 'REAL')
+ensureColumn('price_tables', 'show_suggested_sale', 'INTEGER NOT NULL DEFAULT 0')  // mostra "revende por" no catálogo (tabela de revenda)
 ensureColumn('users', 'password_changed_at', 'TEXT')            // troca/reset de senha invalida tokens antigos
 ensureColumn('products', 'units_per_box', 'INTEGER')           // Ustulimp: venda por caixa (6 un. de 2L, 4 un. de 5L)
 ensureColumn('customers', 'allowed_payment_term_ids', 'TEXT')   // JSON array de IDs ou NULL = todos

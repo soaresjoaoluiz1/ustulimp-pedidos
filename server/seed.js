@@ -3,8 +3,8 @@
  * Lê o catálogo (server/data/products-catalog.js) e popula o banco com:
  *   - 1 admin user (admin@ustulimp.com.br / admin123 — TROCAR no primeiro acesso)
  *   - 6 categorias
- *   - 29 produtos (tabela Ustulimp set/2026)
- *   - 1 tabela de preço (Padrão, pedido mínimo R$ 500)
+ *   - 30 produtos (tabelas Ustulimp out/2026)
+ *   - 2 tabelas de preço (Revenda com mínimo R$ 1.500 e Consumidor final sem mínimo)
  *   - 7 prazos de pagamento padrão
  *
  * Uso:
@@ -62,16 +62,16 @@ function seedCategories() {
 
 function seedPriceTables() {
   const stmt = db.prepare(`
-    INSERT INTO price_tables (name, slug, description, distance_min_km, distance_max_km, minimum_order_value)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO price_tables (name, slug, description, distance_min_km, distance_max_km, minimum_order_value, show_suggested_sale)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
-  const ids = []
+  const bySlug = {}
   PRICE_TABLES.forEach(t => {
-    const r = stmt.run(t.name, t.slug, t.description, t.distance_min_km, t.distance_max_km, t.minimum_order_value)
-    ids.push(r.lastInsertRowid)
+    const r = stmt.run(t.name, t.slug, t.description, t.distance_min_km, t.distance_max_km, t.minimum_order_value, t.show_suggested_sale ? 1 : 0)
+    bySlug[t.slug] = r.lastInsertRowid
   })
   console.log(`[seed] ${PRICE_TABLES.length} tabelas de preço criadas`)
-  return ids
+  return bySlug
 }
 
 function seedPaymentTerms() {
@@ -83,10 +83,10 @@ function seedPaymentTerms() {
   console.log(`[seed] ${PAYMENT_TERMS.length} prazos de pagamento criados`)
 }
 
-function seedProducts(catMap, priceTableIds) {
+function seedProducts(catMap, tableIdBySlug) {
   const insertProd = db.prepare(`
-    INSERT INTO products (sku, name, short_use, description, category_id, unit, units_per_box, image_url, peso_kg, volume_m3, tags)
-    VALUES (?, ?, ?, ?, ?, 'cx', ?, ?, ?, ?, ?)
+    INSERT INTO products (sku, name, short_use, description, category_id, unit, units_per_box, image_url, peso_kg, volume_m3, tags, suggested_sale_price)
+    VALUES (?, ?, ?, ?, ?, 'cx', ?, ?, ?, ?, ?, ?)
   `)
   const insertPrice = db.prepare(`
     INSERT INTO price_table_items (price_table_id, product_id, price)
@@ -98,17 +98,20 @@ function seedProducts(catMap, priceTableIds) {
       const catId = catMap[p.category] || null
       const r = insertProd.run(
         p.sku, p.name, p.short_use, p.description || null, catId,
-        p.units_per_box, p.image_url, p.peso_kg, p.volume_m3, JSON.stringify(p.tags)
+        p.units_per_box, p.image_url, p.peso_kg, p.volume_m3, JSON.stringify(p.tags),
+        p.suggested_sale_price ?? null
       )
       const productId = r.lastInsertRowid
-      // Preço da CAIXA em todas as tabelas (admin diferencia depois)
-      priceTableIds.forEach(tableId => {
-        insertPrice.run(tableId, productId, p.box_price)
+      // Preço da CAIXA em cada tabela (null = produto não vendido naquela tabela)
+      Object.entries(p.prices).forEach(([slug, price]) => {
+        if (price == null) return
+        insertPrice.run(tableIdBySlug[slug], productId, price)
       })
     })
   })
   tx()
-  console.log(`[seed] ${PRODUCTS.length} produtos criados (× ${priceTableIds.length} tabelas = ${PRODUCTS.length * priceTableIds.length} linhas de preço)`)
+  const linhas = db.prepare('SELECT COUNT(*) AS n FROM price_table_items').get().n
+  console.log(`[seed] ${PRODUCTS.length} produtos criados · ${linhas} linhas de preço`)
 }
 
 /* ── EXECUÇÃO ── */
@@ -122,9 +125,9 @@ else if (alreadySeeded()) {
 
 seedAdmin()
 const catMap = seedCategories()
-const priceTableIds = seedPriceTables()
+const tableIdBySlug = seedPriceTables()
 seedPaymentTerms()
-seedProducts(catMap, priceTableIds)
+seedProducts(catMap, tableIdBySlug)
 
 console.log('\n[seed] ✅ Concluído!')
 console.log(`[seed] Admin: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD} (TROCAR após primeiro login)\n`)

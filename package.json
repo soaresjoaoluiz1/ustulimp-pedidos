@@ -13,6 +13,7 @@
     "seed:reset": "node server/seed.js --reset",
     "seed:images": "node server/seed-images.js",
     "seed:images:force": "node server/seed-images.js --force",
+    "tabelas": "node server/apply-tables.js",
     "test:api": "node scripts/regressao.mjs"
   },
   "dependencies": {
