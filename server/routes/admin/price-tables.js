@@ -35,6 +35,11 @@ function publicUrlFor(token) {
 router.post('/:id/public-link', (req, res) => {
   const table = db.prepare('SELECT * FROM price_tables WHERE id = ?').get(req.params.id)
   if (!table) return res.status(404).json({ error: 'Tabela não encontrada' })
+  /* Link de tabela inativa não abre pra ninguém — melhor avisar aqui do que o cliente
+     receber um link que dá "link inválido". */
+  if (!table.is_active) {
+    return res.status(400).json({ error: 'Essa tabela está inativa: o link não abriria. Ative a tabela primeiro.' })
+  }
 
   const token = randomBytes(16).toString('base64url')
   db.prepare(`
@@ -49,6 +54,9 @@ router.patch('/:id/public-link', (req, res) => {
   const table = db.prepare('SELECT * FROM price_tables WHERE id = ?').get(req.params.id)
   if (!table) return res.status(404).json({ error: 'Tabela não encontrada' })
   if (!table.public_token) return res.status(400).json({ error: 'Essa tabela ainda não tem link. Gere um primeiro.' })
+  if (!table.is_active && req.body?.enabled) {
+    return res.status(400).json({ error: 'Essa tabela está inativa: o link não abriria. Ative a tabela primeiro.' })
+  }
 
   const enabled = req.body?.enabled ? 1 : 0
   db.prepare('UPDATE price_tables SET public_enabled = ? WHERE id = ?').run(enabled, table.id)

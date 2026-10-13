@@ -137,6 +137,11 @@ check('mostra o pedido mínimo da tabela', typeof pub.data?.table?.minimum_order
 check('não vaza id nem apelido da tabela', !/"(id|slug|price_table_id)"/.test(JSON.stringify(pub.data?.table || {})))
 check('traz os prazos com as formas de pagamento', pub.data?.payment_terms?.every(t => Array.isArray(t.methods)))
 
+/* Tabela inativa não pode ter link: o cliente receberia uma URL que não abre */
+await call(`/admin/price-tables/${TABELA_ID}`, { method: 'PUT', token: AT, body: { is_active: false } })
+check('não deixa gerar link em tabela inativa', (await call(`/admin/price-tables/${TABELA_ID}/public-link`, { method: 'POST', token: AT })).status === 400)
+await call(`/admin/price-tables/${TABELA_ID}`, { method: 'PUT', token: AT, body: { is_active: true } })
+
 const inexistente = await call('/public/catalog/tokeninventado123456')
 check('token inventado dá 404', inexistente.status === 404)
 await call(`/admin/price-tables/${TABELA_ID}/public-link`, { method: 'PATCH', token: AT, body: { enabled: false } })

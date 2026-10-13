@@ -203,6 +203,16 @@ function PublicLink({ table, onChanged }: { table: PriceTable; onChanged: () => 
     toast.success(msg)
   }
 
+  if (!table.is_active) {
+    return (
+      <div className="mt-3 pt-3 border-t border-slate-100">
+        <p className="text-[11px] text-slate-400 text-center">
+          Tabela inativa não tem link público{table.public_token ? ' — o link gerado antes não abre' : ''}. Ative a tabela pra liberar.
+        </p>
+      </div>
+    )
+  }
+
   if (!table.public_token) {
     return (
       <div className="mt-3 pt-3 border-t border-slate-100">
