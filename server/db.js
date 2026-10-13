@@ -217,6 +217,32 @@ ensureColumn('users', 'password_changed_at', 'TEXT')            // troca/reset d
 ensureColumn('products', 'units_per_box', 'INTEGER')           // Ustulimp: venda por caixa (6 un. de 2L, 4 un. de 5L)
 ensureColumn('customers', 'allowed_payment_term_ids', 'TEXT')   // JSON array de IDs ou NULL = todos
 
+/* ── Link público: catálogo aberto por tabela de preço ── */
+ensureColumn('price_tables', 'public_token', 'TEXT')            // token do link; NULL = tabela sem link
+ensureColumn('price_tables', 'public_enabled', 'INTEGER NOT NULL DEFAULT 0')  // pausar ≠ revogar: pausa mantém a URL
+ensureColumn('price_tables', 'public_token_created_at', 'TEXT')
+
+ensureColumn('orders', 'source', "TEXT NOT NULL DEFAULT 'portal'")  // 'portal' (logado) | 'public_link'
+ensureColumn('orders', 'public_token_used', 'TEXT')             // qual link trouxe o pedido
+/* Endereço de entrega congelado no pedido (o cadastro do cliente pode mudar depois) */
+ensureColumn('orders', 'delivery_address', 'TEXT')
+ensureColumn('orders', 'delivery_city', 'TEXT')
+ensureColumn('orders', 'delivery_state', 'TEXT')
+ensureColumn('orders', 'delivery_zip_code', 'TEXT')
+
+/* document vem com máscara ("55.300.717/0001-40"); só os dígitos permitem reconhecer
+   que o mesmo CNPJ já comprou antes pelo link */
+ensureColumn('customers', 'document_digits', 'TEXT')
+ensureColumn('customers', 'email', 'TEXT')                      // quem vem pelo link não tem user pra guardar e-mail
+ensureColumn('customers', 'origin', 'TEXT')                     // 'link' = se cadastrou sozinho pelo catálogo aberto
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_pt_public_token
+    ON price_tables(public_token) WHERE public_token IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_customers_document_digits ON customers(document_digits);
+  CREATE INDEX IF NOT EXISTS idx_orders_source ON orders(source);
+`)
+
 console.log('[db] Schema OK em', dbPath)
 
 export default db

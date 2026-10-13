@@ -87,6 +87,19 @@ Depois de editar: build + push + Update from Remote e, no cPanel → Node.js →
 `npm run tabelas` é seguro em produção: cria/atualiza tabelas e preços, cria produto novo pelo SKU,
 move os clientes da tabela antiga pra nova e desativa a antiga. **Não** apaga pedidos, clientes nem fotos.
 
+## Link público do catálogo
+Cada tabela de preço pode ter um link aberto: admin → **Tabelas de preço** → *Gerar link público* →
+`https://ustulimp.com.br/pedidos/c/<token>`. Quem abre vê os preços daquela tabela, monta o pedido e
+finaliza informando nome, CNPJ/CPF, WhatsApp e endereço de entrega — **sem criar senha**.
+
+- *Pausar* mantém a URL; *Trocar* gera outra e derruba a antiga na hora.
+- O pedido chega no painel com a etiqueta **Link** e o endereço de entrega.
+- Quem comprou vira cliente **sem acesso**; o login é criado depois em Clientes → *Criar acesso*.
+- Limites de produção (podem ser ajustados por variável de ambiente): `PUBLIC_ORDER_MAX` (8 pedidos
+  por hora por IP) e `PUBLIC_ORDER_MAX_PER_DOC` (5 por dia por documento). Tentativa recusada pelo
+  formulário não gasta cota.
+- O app precisa de `app.set('trust proxy')` — já está no código — pra enxergar o IP real atrás do Apache.
+
 ## Fotos dos produtos
 Arquivos em `public/products/` → entram no build → URL `/pedidos/products/<arquivo>`.
 O `image_url` de cada produto fica no catálogo (`server/data/products-catalog.js`, por SKU).

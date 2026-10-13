@@ -19,6 +19,7 @@ import adminPaymentTermsRoutes from './routes/admin/payment-terms.js'
 import adminDashboardRoutes from './routes/admin/dashboard.js'
 import adminUploadRoutes, { UPLOADS_DIR } from './routes/admin/upload.js'
 import adminCnpjRoutes from './routes/admin/cnpj.js'
+import publicRoutes from './routes/public.js'
 
 import { requireAuth, requireAdmin } from './middleware/auth.js'
 
@@ -43,6 +44,10 @@ try {
 
 const app = express()
 
+/* Atrás do Apache/Passenger (cPanel): sem isto req.ip seria sempre o loopback e todo
+   freio por IP (login e link público) viraria um limite global. */
+app.set('trust proxy', 1)
+
 app.use(cors({
   origin: NODE_ENV === 'development' ? 'http://localhost:5177' : true,
   credentials: true
@@ -60,8 +65,13 @@ if (BASE) {
   })
 }
 
-/* ── Healthcheck ── */
+/* ── Healthcheck (público: não expõe número de clientes/pedidos) ── */
 app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'ustulimp-pedidos', version: '0.1.0', timestamp: new Date().toISOString() })
+})
+
+/* Números do sistema: só pra quem é admin */
+app.get('/api/admin/health', requireAuth, requireAdmin, (req, res) => {
   const counts = {
     users:        db.prepare('SELECT COUNT(*) as n FROM users').get().n,
     categories:   db.prepare('SELECT COUNT(*) as n FROM categories').get().n,
@@ -70,15 +80,7 @@ app.get('/api/health', (req, res) => {
     customers:    db.prepare('SELECT COUNT(*) as n FROM customers').get().n,
     orders:       db.prepare('SELECT COUNT(*) as n FROM orders').get().n
   }
-  res.json({
-    ok: true,
-    service: 'ustulimp-pedidos',
-    version: '0.1.0',
-    env: NODE_ENV,
-    db: 'sqlite',
-    counts,
-    timestamp: new Date().toISOString()
-  })
+  res.json({ ok: true, env: NODE_ENV, db: 'sqlite', counts, timestamp: new Date().toISOString() })
 })
 
 /* ── Auth (público) ── */
@@ -87,6 +89,9 @@ app.use('/api/auth', authRoutes)
 /* ── Catálogo do cliente (autenticado) ── */
 app.use('/api/catalog', catalogRoutes)
 app.use('/api/orders', customerOrderRoutes)
+
+/* ── Link público (sem login) — montado ANTES do guard de admin ── */
+app.use('/api/public', express.json({ limit: '64kb' }), publicRoutes)
 
 /* ── Admin (autenticado + role=admin) ── */
 app.use('/api/admin', requireAuth, requireAdmin)

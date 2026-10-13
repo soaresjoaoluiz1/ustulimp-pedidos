@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Pencil, Trash2, Layers, Edit3 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Layers, Edit3, Link2, Copy, RefreshCw, EyeOff, Eye } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Card, Button, Input, Modal, Badge, EmptyState, toast, Textarea } from '@/components/ui'
 import { PageHeader } from '@/components/admin/AdminLayout'
@@ -17,6 +17,10 @@ interface PriceTable {
   is_active: number
   items_count: number
   customers_count: number
+  public_token?: string | null
+  public_enabled?: number
+  public_orders_count?: number
+  show_suggested_sale?: number
 }
 
 export default function PriceTables() {
@@ -101,6 +105,8 @@ export default function PriceTables() {
               <Button variant="secondary" className="w-full" onClick={() => navigate(`/admin/price-tables/${t.id}/items`)}>
                 <Edit3 className="w-4 h-4" /> Editar preços
               </Button>
+
+              <PublicLink table={t} onChanged={load} />
             </Card>
           ))}
         </div>
@@ -174,5 +180,86 @@ function PriceTableModal({ table, onClose, onSaved }: { table: PriceTable | null
         </div>
       </div>
     </Modal>
+  )
+}
+
+/** Link aberto do catálogo: gerar, copiar, pausar e trocar. */
+function PublicLink({ table, onChanged }: { table: PriceTable; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [url, setUrl] = useState<string | null>(
+    table.public_token ? `${window.location.origin}${import.meta.env.BASE_URL}c/${table.public_token}` : null
+  )
+  const ativo = !!table.public_token && table.public_enabled === 1
+
+  async function acao(fn: () => Promise<any>, msg: string) {
+    setBusy(true)
+    try { const r = await fn(); if (r?.url) setUrl(`${window.location.origin}${import.meta.env.BASE_URL}c/${r.token}`); toast.success(msg); onChanged() }
+    catch (err: any) { toast.error(err.message) }
+    finally { setBusy(false) }
+  }
+
+  function copiar(texto: string, msg: string) {
+    navigator.clipboard.writeText(texto)
+    toast.success(msg)
+  }
+
+  if (!table.public_token) {
+    return (
+      <div className="mt-3 pt-3 border-t border-slate-100">
+        <Button variant="ghost" size="sm" className="w-full text-navy-700" loading={busy}
+          onClick={() => acao(() => api.post(`/admin/price-tables/${table.id}/public-link`), 'Link gerado')}>
+          <Link2 className="w-4 h-4" /> Gerar link público
+        </Button>
+        <p className="text-[11px] text-slate-400 mt-1 text-center">
+          Quem tiver o link vê os preços desta tabela{table.show_suggested_sale ? ', inclusive a revenda sugerida' : ''}.
+        </p>
+      </div>
+    )
+  }
+
+  const msgWhats = `Olá! Segue o catálogo da ${'Ustulimp'} com os seus preços. É só montar o pedido pelo link: ${url}`
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Link público</span>
+        <Badge className={ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
+          {ativo ? 'Ativo' : 'Pausado'}
+        </Badge>
+      </div>
+
+      <div className="flex gap-1">
+        <input readOnly value={url || ''} onFocus={e => e.currentTarget.select()}
+          className="flex-1 min-w-0 px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-600" />
+        <Button variant="ghost" size="sm" onClick={() => copiar(url || '', 'Link copiado')} title="Copiar link">
+          <Copy className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <Button variant="secondary" size="sm" className="w-full"
+        onClick={() => copiar(msgWhats, 'Mensagem copiada — é só colar no WhatsApp')}>
+        Copiar mensagem pro WhatsApp
+      </Button>
+
+      <div className="flex gap-1">
+        <Button variant="ghost" size="sm" className="flex-1" loading={busy}
+          onClick={() => acao(() => api.patch(`/admin/price-tables/${table.id}/public-link`, { enabled: !ativo }), ativo ? 'Link pausado' : 'Link reativado')}>
+          {ativo ? <><EyeOff className="w-4 h-4" /> Pausar</> : <><Eye className="w-4 h-4" /> Reativar</>}
+        </Button>
+        <Button variant="ghost" size="sm" className="flex-1 text-red-500 hover:bg-red-50" loading={busy}
+          onClick={() => {
+            if (!confirm('Gerar um link novo invalida o atual. Quem já recebeu o link antigo não vai mais conseguir abrir. Continuar?')) return
+            acao(() => api.post(`/admin/price-tables/${table.id}/public-link`), 'Link novo gerado')
+          }}>
+          <RefreshCw className="w-4 h-4" /> Trocar
+        </Button>
+      </div>
+
+      {(table.public_orders_count || 0) > 0 && (
+        <p className="text-[11px] text-slate-500 text-center">
+          {table.public_orders_count} pedido(s) vieram deste link
+        </p>
+      )}
+    </div>
   )
 }

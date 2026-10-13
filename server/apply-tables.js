@@ -23,7 +23,22 @@ const MIGRAR_PARA = 'revenda'
 
 const log = (...a) => console.log('[tabelas]', ...a)
 
+/* Documento sem máscara nos cadastros antigos: é o que permite reconhecer, no link
+   público, que aquele CNPJ já é cliente. Só preenche o que está vazio. */
+function backfillDocumentDigits() {
+  const rows = db.prepare(`SELECT id, document FROM customers WHERE document IS NOT NULL AND (document_digits IS NULL OR document_digits = '')`).all()
+  const upd = db.prepare('UPDATE customers SET document_digits = ? WHERE id = ?')
+  let n = 0
+  for (const r of rows) {
+    const digits = String(r.document).replace(/\D/g, '')
+    if (digits) { upd.run(digits, r.id); n++ }
+  }
+  if (n) log(`${n} documento(s) normalizado(s) (document_digits)`)
+}
+
 const tx = db.transaction(() => {
+  backfillDocumentDigits()
+
   /* 1. categorias que faltam */
   const catBySlug = {}
   for (const c of CATEGORIES) {

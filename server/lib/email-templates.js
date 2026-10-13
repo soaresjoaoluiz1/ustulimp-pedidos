@@ -35,7 +35,7 @@ function shell(content, preheader = '') {
 /**
  * Email pro admin avisando novo pedido.
  */
-export function adminNewOrderTemplate({ order, items, customer }) {
+export function adminNewOrderTemplate({ order, items, customer, viaPublicLink = false }) {
   const itemsRows = items.map(it => `
     <tr>
       <td style="padding:8px 0;border-bottom:1px solid #e2e8f0;">
@@ -50,8 +50,8 @@ export function adminNewOrderTemplate({ order, items, customer }) {
 
   const content = `
     <tr><td style="padding:32px;">
-      <div style="background:#dbeafe;color:#1e40af;display:inline-block;padding:6px 14px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;">
-        🛒 Novo pedido
+      <div style="background:${viaPublicLink ? '#ede9fe' : '#dbeafe'};color:${viaPublicLink ? '#5b21b6' : '#1e40af'};display:inline-block;padding:6px 14px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px;">
+        ${viaPublicLink ? '🔗 Novo pedido pelo LINK' : '🛒 Novo pedido'}
       </div>
       <h1 style="margin:0 0 8px;font-size:24px;color:#024F83;font-weight:800;">${escapeHtml(order.order_number)}</h1>
       <p style="margin:0 0 24px;color:#475569;font-size:14px;line-height:1.6;">
@@ -63,6 +63,14 @@ export function adminNewOrderTemplate({ order, items, customer }) {
           <td style="padding:6px 0;color:#64748b;font-size:12px;">Cliente</td>
           <td style="padding:6px 0;color:#024F83;font-size:13px;font-weight:600;text-align:right;">${escapeHtml(customer.company_name || customer.name)}</td>
         </tr>
+        ${order.delivery_address ? `<tr>
+          <td style="padding:6px 0;color:#64748b;font-size:12px;">Entrega</td>
+          <td style="padding:6px 0;color:#024F83;font-size:13px;font-weight:600;text-align:right;">${escapeHtml(order.delivery_address)}${order.delivery_city ? `<br>${escapeHtml(order.delivery_city)}/${escapeHtml(order.delivery_state || '')}` : ''}${order.delivery_zip_code ? ` · ${escapeHtml(order.delivery_zip_code)}` : ''}</td>
+        </tr>` : ''}
+        ${customer.document ? `<tr>
+          <td style="padding:6px 0;color:#64748b;font-size:12px;">${escapeHtml((customer.document_type || 'doc').toUpperCase())}</td>
+          <td style="padding:6px 0;color:#024F83;font-size:13px;font-weight:600;text-align:right;">${escapeHtml(customer.document)}</td>
+        </tr>` : ''}
         ${customer.city ? `<tr>
           <td style="padding:6px 0;color:#64748b;font-size:12px;">Cidade</td>
           <td style="padding:6px 0;color:#024F83;font-size:13px;font-weight:600;text-align:right;">${escapeHtml(customer.city)}/${escapeHtml(customer.state || '')}</td>
@@ -106,7 +114,7 @@ export function adminNewOrderTemplate({ order, items, customer }) {
   `
 
   return {
-    subject: `🛒 Novo pedido ${order.order_number} · ${customer.company_name || customer.name} · ${fmtBRL(order.total_value)}`,
+    subject: `${viaPublicLink ? '🔗 Pedido pelo LINK' : '🛒 Novo pedido'} ${order.order_number} · ${customer.company_name || customer.name} · ${fmtBRL(order.total_value)}`,
     html: shell(content, `Novo pedido de ${customer.company_name || customer.name} no valor de ${fmtBRL(order.total_value)}`),
     text: `Novo pedido ${order.order_number} de ${customer.company_name || customer.name}. Total: ${fmtBRL(order.total_value)}. Abra: ${orderUrl}`
   }
@@ -142,7 +150,11 @@ export function customerOrderConfirmedTemplate({ order, items, customer }) {
         <p style="margin:0 0 14px;font-size:14px;color:#475569;line-height:1.6;">
           Um consultor da Ustulimp vai entrar em contato em breve em horário comercial pra confirmar a entrega e instruções de pagamento.
         </p>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        ${viaPublicLink && !customer.user_id ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#92400e;">
+        Esse cliente ainda <strong>não tem acesso ao portal</strong>. Se virar comprador recorrente, crie o login no painel (Clientes → Criar acesso).
+      </div>` : ''}
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           ${itemsRows}${moreItems}
           <tr>
             <td colspan="2" style="padding:12px 0 0;font-size:14px;color:#64748b;border-top:2px solid #e2e8f0;">Total</td>

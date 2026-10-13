@@ -11,6 +11,8 @@ import { fmtBRL } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { boxInfo, resaleInfo, baseName, packLabel } from '@/lib/pricing'
 import { CategoryIcon } from '@/lib/categoryIcons'
+import Logo from '@/components/Logo'
+import { COMPANY, waLink } from '@/lib/company'
 
 interface Category {
   id: number
@@ -40,8 +42,12 @@ function groupVariants(list: CatalogProduct[]): { base: string; variants: Catalo
   }))
 }
 
-export default function Catalog() {
+/** `publicToken` = catálogo aberto por link (sem login). Sem ele, é o catálogo do cliente logado. */
+export default function Catalog({ publicToken }: { publicToken?: string }) {
   const { customer } = useAuth()
+  const { setPublicScope } = useCart()
+  const [tableInfo, setTableInfo] = useState<{ name: string; minimum_order_value: number } | null>(null)
+  const [linkInvalido, setLinkInvalido] = useState(false)
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,17 +63,31 @@ export default function Catalog() {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
       if (categoryId) params.set('category_id', String(categoryId))
-      const data = await api.get<{ products: CatalogProduct[] }>(`/catalog${params.toString() ? '?' + params : ''}`)
-      setProducts(data.products)
+      const qs = params.toString() ? '?' + params : ''
+      if (publicToken) {
+        /* O link devolve tudo de uma vez: tabela, produtos e categorias */
+        const data = await api.get<any>(`/public/catalog/${publicToken}${qs}`)
+        setProducts(data.products)
+        setCategories(data.categories)
+        setTableInfo(data.table)
+      } else {
+        const data = await api.get<{ products: CatalogProduct[] }>(`/catalog${qs}`)
+        setProducts(data.products)
+      }
+    } catch (err: any) {
+      if (publicToken) setLinkInvalido(true)
     } finally { setLoading(false) }
   }
 
   async function loadCategories() {
+    if (publicToken) return   // vêm junto do catálogo público
     const data = await api.get<{ categories: Category[] }>('/catalog/categories')
     setCategories(data.categories)
   }
 
   useEffect(() => { loadCategories() }, [])
+  /* Carrinho do visitante é separado por link */
+  useEffect(() => { setPublicScope(publicToken || null) }, [publicToken])
   useEffect(() => {
     const t = setTimeout(loadProducts, 300)
     return () => clearTimeout(t)
@@ -89,9 +109,29 @@ export default function Catalog() {
   }, [products, categoryId, categories])
 
   const featured = useMemo(() => products.filter(p => p.featured === 1).slice(0, 6), [products])
+  const minimo = tableInfo?.minimum_order_value || 0
+
+  if (linkInvalido) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="max-w-md text-center">
+          <Logo size="lg" className="justify-center mb-6" />
+          <h1 className="font-display text-xl font-bold text-navy-800 mb-2">Link inválido ou expirado</h1>
+          <p className="text-sm text-slate-500 mb-5">
+            Esse link de catálogo não está mais valendo. Peça um novo ao vendedor.
+          </p>
+          {waLink('Olá! O link do catálogo que recebi não está funcionando.') && (
+            <a href={waLink('Olá! O link do catálogo que recebi não está funcionando.')!} target="_blank" rel="noopener noreferrer">
+              <Button>Falar no WhatsApp</Button>
+            </a>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <CustomerLayout search={search} onSearchChange={setSearch} onCartClick={() => setCartOpen(true)}>
+    <CustomerLayout publicMode={!!publicToken} search={search} onSearchChange={setSearch} onCartClick={() => setCartOpen(true)}>
       {/* Hero / Banner */}
       <section className="bg-gradient-to-br from-navy-900 via-navy-800 to-navy-700 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
@@ -100,16 +140,23 @@ export default function Catalog() {
             <span className="text-xs font-bold uppercase tracking-wider text-brand-cyan">Bem-vindo</span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2">
-            {customer?.company_name || customer?.name || 'Olá'} 👋
+            {publicToken ? `${COMPANY.name} · Monte seu pedido` : `${customer?.company_name || customer?.name || 'Olá'} 👋`}
           </h1>
           <p className="text-white/70 max-w-2xl">
-            Monte seu pedido com os produtos desejados. Quando finalizar o envio do pedido, um consultor entra em contato pra confirmar a entrega e pagamento.
+            {publicToken
+              ? 'Escolha os produtos, monte seu pedido e finalize informando seus dados. Não precisa de cadastro nem senha — um consultor entra em contato pra confirmar entrega e pagamento.'
+              : 'Monte seu pedido com os produtos desejados. Quando finalizar o envio do pedido, um consultor entra em contato pra confirmar a entrega e pagamento.'}
           </p>
+          {publicToken && minimo > 0 && (
+            <p className="mt-2 text-sm text-white/80">
+              Pedido mínimo desta tabela: <b className="text-white">{fmtBRL(minimo)}</b>
+            </p>
+          )}
 
           <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-6 max-w-2xl">
             <Stat icon={<Package className="w-4 h-4" />} label="Produtos" value={String(new Set(products.map(p => baseName(p.name))).size)} />
             <Stat icon={<Tag className="w-4 h-4" />} label="Categorias" value={categories.filter(c => c.product_count > 0).length.toString()} />
-            <Stat icon={<Sparkles className="w-4 h-4" />} label="Sua tabela" value={customer?.price_table_name || 'Padrão'} />
+            <Stat icon={<Sparkles className="w-4 h-4" />} label={publicToken ? 'Tabela' : 'Sua tabela'} value={tableInfo?.name || customer?.price_table_name || '—'} />
           </div>
         </div>
       </section>
@@ -192,7 +239,12 @@ export default function Catalog() {
         </div>
       </div>
 
-      <CartSidebar open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartSidebar
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        minimumOrderValue={publicToken ? minimo : undefined}
+        checkoutPath={publicToken ? `/c/${publicToken}/checkout` : '/app/checkout'}
+      />
 
       {/* Mobile filters drawer */}
       {mobileFiltersOpen && (

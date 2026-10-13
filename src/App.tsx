@@ -21,6 +21,9 @@ import MyOrders from '@/pages/app/MyOrders'
 import MyOrderDetail from '@/pages/app/MyOrderDetail'
 import OrderPrint from '@/pages/OrderPrint'
 
+import PublicCatalog from '@/pages/public/PublicCatalog'
+import PublicCheckout from '@/pages/public/PublicCheckout'
+
 function RequireAuth({ role, children }: { role?: 'admin' | 'cliente'; children: ReactNode }) {
   const { user, loading } = useAuth()
   const location = useLocation()
@@ -57,6 +60,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<Login />} />
+
+        {/* Catálogo aberto por link — SEM login */}
+        <Route path="/c/:token" element={<PublicCatalog />} />
+        <Route path="/c/:token/checkout" element={<PublicCheckout />} />
 
         <Route path="/admin" element={<RequireAuth role="admin"><AdminLayout><Dashboard /></AdminLayout></RequireAuth>} />
         <Route path="/admin/orders" element={<RequireAuth role="admin"><AdminLayout><Orders /></AdminLayout></RequireAuth>} />

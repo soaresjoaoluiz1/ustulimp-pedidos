@@ -30,7 +30,8 @@ function exportCsv(req, res) {
     SELECT
       o.id, o.order_number, o.created_at, o.status,
       o.subtotal, o.total_value, o.payment_term, o.payment_method, o.notes,
-      o.peso_total_kg, o.volume_total_m3, o.items_count,
+      o.peso_total_kg, o.volume_total_m3, o.items_count, o.source,
+      o.delivery_address, o.delivery_city, o.delivery_state, o.delivery_zip_code,
       c.name AS customer_name, c.company_name, c.document, c.document_type,
       c.phone, c.whatsapp, c.city, c.state, c.address,
       pt.name AS price_table_name
@@ -54,9 +55,10 @@ function exportCsv(req, res) {
   }
 
   const headers = [
-    'numero', 'data', 'status',
+    'numero', 'data', 'status', 'origem',
     'cliente', 'empresa', 'documento', 'tipo_doc',
     'telefone', 'whatsapp', 'cidade', 'estado', 'endereco',
+    'entrega_endereco', 'entrega_cidade', 'entrega_uf', 'entrega_cep',
     'tabela_preco', 'prazo_pagamento', 'forma_pagamento',
     'qtd_itens', 'peso_kg', 'volume_m3',
     'subtotal', 'total',
@@ -70,6 +72,7 @@ function exportCsv(req, res) {
       o.order_number,
       o.created_at,
       STATUS_LABEL[o.status] || o.status,
+      o.source === 'public_link' ? 'Link público' : 'Portal',
       o.customer_name,
       o.company_name,
       o.document,
@@ -79,6 +82,10 @@ function exportCsv(req, res) {
       o.city,
       o.state,
       o.address,
+      o.delivery_address,
+      o.delivery_city,
+      o.delivery_state,
+      o.delivery_zip_code,
       o.price_table_name,
       o.payment_term,
       o.payment_method,
@@ -107,10 +114,11 @@ router.get('/export.csv', exportCsv)
 
 /* GET /api/admin/orders?status=&customer_id=&search=&from=&to= */
 router.get('/', (req, res) => {
-  const { status, customer_id, search, from, to } = req.query
+  const { status, customer_id, search, from, to, source } = req.query
   const where = []
   const params = []
   if (status) { where.push('o.status = ?'); params.push(status) }
+  if (source) { where.push('o.source = ?'); params.push(source) }
   if (customer_id) { where.push('o.customer_id = ?'); params.push(customer_id) }
   if (from) { where.push('o.created_at >= ?'); params.push(from) }
   if (to) { where.push('o.created_at <= ?'); params.push(to) }
@@ -141,6 +149,7 @@ router.get('/:id', (req, res) => {
   const order = db.prepare(`
     SELECT o.*, c.name AS customer_name, c.company_name, c.phone, c.whatsapp,
            c.city, c.state, c.address, c.document, c.document_type,
+           c.user_id AS customer_user_id, c.origin AS customer_origin,
            pt.name AS price_table_name
     FROM orders o
     LEFT JOIN customers c ON c.id = o.customer_id

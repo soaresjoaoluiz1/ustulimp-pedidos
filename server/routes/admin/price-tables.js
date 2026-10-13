@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import db from '../../db.js'
+import { randomBytes } from 'crypto'
 
 const router = Router()
 
@@ -13,11 +14,52 @@ router.get('/', (req, res) => {
   const rows = db.prepare(`
     SELECT pt.*,
            (SELECT COUNT(*) FROM price_table_items pti WHERE pti.price_table_id = pt.id AND pti.is_active = 1) AS items_count,
-           (SELECT COUNT(*) FROM customers c WHERE c.price_table_id = pt.id AND c.is_active = 1) AS customers_count
+           (SELECT COUNT(*) FROM customers c WHERE c.price_table_id = pt.id AND c.is_active = 1) AS customers_count,
+           (SELECT COUNT(*) FROM orders o WHERE o.price_table_id = pt.id AND o.source = 'public_link') AS public_orders_count
     FROM price_tables pt
     ORDER BY pt.id
   `).all()
   res.json({ price_tables: rows })
+})
+
+/* ── Link público do catálogo ──
+   POST   gera (ou troca) o token e liga o link
+   PATCH  pausa/retoma mantendo a mesma URL
+   DELETE revoga: a URL antiga morre na hora */
+
+function publicUrlFor(token) {
+  const base = (process.env.APP_URL || 'http://localhost:5177/pedidos').replace(/\/$/, '')
+  return `${base}/c/${token}`
+}
+
+router.post('/:id/public-link', (req, res) => {
+  const table = db.prepare('SELECT * FROM price_tables WHERE id = ?').get(req.params.id)
+  if (!table) return res.status(404).json({ error: 'Tabela não encontrada' })
+
+  const token = randomBytes(16).toString('base64url')
+  db.prepare(`
+    UPDATE price_tables
+    SET public_token = ?, public_enabled = 1, public_token_created_at = datetime('now')
+    WHERE id = ?
+  `).run(token, table.id)
+  res.json({ token, url: publicUrlFor(token), enabled: true })
+})
+
+router.patch('/:id/public-link', (req, res) => {
+  const table = db.prepare('SELECT * FROM price_tables WHERE id = ?').get(req.params.id)
+  if (!table) return res.status(404).json({ error: 'Tabela não encontrada' })
+  if (!table.public_token) return res.status(400).json({ error: 'Essa tabela ainda não tem link. Gere um primeiro.' })
+
+  const enabled = req.body?.enabled ? 1 : 0
+  db.prepare('UPDATE price_tables SET public_enabled = ? WHERE id = ?').run(enabled, table.id)
+  res.json({ token: table.public_token, url: publicUrlFor(table.public_token), enabled: !!enabled })
+})
+
+router.delete('/:id/public-link', (req, res) => {
+  const table = db.prepare('SELECT * FROM price_tables WHERE id = ?').get(req.params.id)
+  if (!table) return res.status(404).json({ error: 'Tabela não encontrada' })
+  db.prepare('UPDATE price_tables SET public_token = NULL, public_enabled = 0 WHERE id = ?').run(table.id)
+  res.json({ ok: true })
 })
 
 /* GET /api/admin/price-tables/:id/items — lista TODOS produtos com flag se tem preço nessa tabela */

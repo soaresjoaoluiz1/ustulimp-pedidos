@@ -23,6 +23,10 @@ type CartState = {
   removeItem: (productId: number) => void
   clear: () => void
   removeMany: (productIds: number[]) => void
+  /** Liga o carrinho a um link público (null = carrinho do usuário logado) */
+  setPublicScope: (token: string | null) => void
+  /** Link público que o carrinho está usando agora (null = carrinho do usuário) */
+  publicScope: string | null
   subtotal: number
   totalItems: number
   totalQty: number
@@ -35,13 +39,17 @@ const CartContext = createContext<CartState | null>(null)
 
 /* Carrinho é POR USUÁRIO: num PC compartilhado (balcão da loja), o próximo a logar
    não pode herdar o carrinho — e os preços — de quem usou antes. */
-function storageKey(userId?: number | null) {
-  return userId ? `ustulimp_pedidos_cart_u${userId}` : 'ustulimp_pedidos_cart_anon'
+function storageKey(userId?: number | null, publicToken?: string | null) {
+  if (userId) return `ustulimp_pedidos_cart_u${userId}`
+  /* Carrinho do visitante é POR LINK: dois links diferentes têm preços diferentes,
+     então não podem compartilhar carrinho no mesmo celular. */
+  if (publicToken) return `ustulimp_pedidos_cart_t${publicToken}`
+  return 'ustulimp_pedidos_cart_anon'
 }
 
-function loadCart(userId?: number | null): CartItem[] {
+function loadCart(userId?: number | null, publicToken?: string | null): CartItem[] {
   try {
-    const raw = localStorage.getItem(storageKey(userId))
+    const raw = localStorage.getItem(storageKey(userId, publicToken))
     if (!raw) return []
     const data = JSON.parse(raw)
     if (!Array.isArray(data)) return []
@@ -51,8 +59,8 @@ function loadCart(userId?: number | null): CartItem[] {
   } catch { return [] }
 }
 
-function saveCart(userId: number | null | undefined, items: CartItem[]) {
-  try { localStorage.setItem(storageKey(userId), JSON.stringify(items)) } catch {}
+function saveCart(userId: number | null | undefined, publicToken: string | null, items: CartItem[]) {
+  try { localStorage.setItem(storageKey(userId, publicToken), JSON.stringify(items)) } catch {}
 }
 
 /** Quantidade sempre em CAIXAS inteiras, de 1 a 999 (texto colado/NaN vira 0 = remove). */
@@ -65,12 +73,24 @@ export function sanitizeQty(q: unknown): number {
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const userId = user?.id ?? null
-  const [items, setItems] = useState<CartItem[]>(() => loadCart(null))
+  const [publicToken, setPublicToken] = useState<string | null>(null)
+  const [items, setItems] = useState<CartItem[]>(() => loadCart(null, null))
+  /* Qual escopo está de fato carregado em `items`. Sem isso, no instante em que o escopo
+     muda a tela veria o carrinho do escopo anterior (e acharia que está vazio). */
+  const [loadedScope, setLoadedScope] = useState<string | null>(null)
 
-  /* Trocou de usuário (login/logout): carrega o carrinho daquele usuário */
-  useEffect(() => { setItems(loadCart(userId)) }, [userId])
+  /* Trocou de usuário (login/logout) ou de link: carrega o carrinho daquele escopo */
+  useEffect(() => {
+    setItems(loadCart(userId, publicToken))
+    setLoadedScope(publicToken)
+  }, [userId, publicToken])
 
-  useEffect(() => { saveCart(userId, items) }, [items, userId])
+  /* Só grava depois que o carrinho do escopo atual foi carregado — senão o escopo novo
+     seria sobrescrito com o carrinho do escopo antigo (vazio) e o cliente perderia tudo. */
+  useEffect(() => {
+    if (loadedScope !== publicToken) return
+    saveCart(userId, publicToken, items)
+  }, [items, userId, publicToken, loadedScope])
 
   function addItem(item: Omit<CartItem, 'quantity'>, qty = 1) {
     const add = sanitizeQty(qty) || 1
@@ -135,6 +155,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider value={{
       items,
       addItem, updateQty, updatePrice, removeItem, removeMany, clear, getQty,
+      setPublicScope: setPublicToken,
+      publicScope: loadedScope,
       subtotal: totals.subtotal,
       totalItems: items.length,
       totalQty: totals.totalQty,

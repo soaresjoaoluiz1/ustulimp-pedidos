@@ -95,6 +95,16 @@ export default function OrderPrint() {
               <div><span className="text-slate-500">Tabela:</span> <strong>{order.price_table_name}</strong></div>
               <div><span className="text-slate-500">Prazo:</span> <strong>{order.payment_term || '—'}</strong></div>
               <div><span className="text-slate-500">Forma:</span> <strong className="capitalize">{order.payment_method || '—'}</strong></div>
+              {order.delivery_address && (
+                <div className="pt-2 mt-2 border-t border-slate-100">
+                  <div className="text-slate-500">Entregar em:</div>
+                  <div><strong>{order.delivery_address}</strong></div>
+                  <div className="text-slate-500">
+                    {order.delivery_city}{order.delivery_state ? `/${order.delivery_state}` : ''}
+                    {order.delivery_zip_code ? ` · ${order.delivery_zip_code}` : ''}
+                  </div>
+                </div>
+              )}
               <div className="pt-2 mt-2 border-t border-slate-100">
                 <div className="text-slate-500">Peso bruto: <strong>{fmtNumber(order.peso_total_kg, 2)} kg</strong></div>
                 {order.volume_total_m3 > 0 && <div className="text-slate-500">Volume: <strong>{fmtNumber(order.volume_total_m3, 4)} m³</strong></div>}

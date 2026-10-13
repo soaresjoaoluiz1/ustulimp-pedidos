@@ -10,12 +10,14 @@ import { COMPANY, waLink } from '@/lib/company'
 
 interface Props {
   children: ReactNode
+  /** Catálogo aberto por link: sem menu de conta, com atalho de login */
+  publicMode?: boolean
   search?: string
   onSearchChange?: (s: string) => void
   onCartClick: () => void
 }
 
-export default function CustomerLayout({ children, search, onSearchChange, onCartClick }: Props) {
+export default function CustomerLayout({ children, publicMode = false, search, onSearchChange, onCartClick }: Props) {
   const { user, customer, logout } = useAuth()
   const { subtotal, totalItems, totalQty } = useCart()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -40,7 +42,7 @@ export default function CustomerLayout({ children, search, onSearchChange, onCar
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center gap-3 sm:gap-6 h-16">
             {/* Logo */}
-            <Link to="/app" className="flex items-center gap-2 flex-shrink-0">
+            <Link to={publicMode ? '#' : '/app'} onClick={e => publicMode && e.preventDefault()} className="flex items-center gap-2 flex-shrink-0">
               <Logo size="sm" />
             </Link>
 
@@ -76,7 +78,13 @@ export default function CustomerLayout({ children, search, onSearchChange, onCar
               </span>
             </button>
 
-            {/* User menu */}
+            {/* Catálogo aberto: sem conta, só o atalho de login */}
+            {publicMode ? (
+              <Link to="/login" className="text-sm font-semibold text-navy-700 hover:text-navy-900 whitespace-nowrap">
+                <span className="hidden sm:inline">Já sou cliente? </span>Entrar
+              </Link>
+            ) : (
+            /* User menu */
             <div className="relative" onClick={e => e.stopPropagation()}>
               <button
                 onClick={() => setMenuOpen(v => !v)}
@@ -105,6 +113,7 @@ export default function CustomerLayout({ children, search, onSearchChange, onCar
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </header>

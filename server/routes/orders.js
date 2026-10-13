@@ -1,33 +1,23 @@
+/**
+ * Pedidos do cliente logado. A regra de criação (preço, mínimo, pagamento, snapshot) fica em
+ * `server/lib/order-create.js`, compartilhada com o link público.
+ */
 import { Router } from 'express'
 import db from '../db.js'
 import { requireAuth, requireCustomer } from '../middleware/auth.js'
-import { sendMail } from '../lib/mailer.js'
-import { adminNewOrderTemplate, customerOrderConfirmedTemplate } from '../lib/email-templates.js'
-import { allowedTermsForCustomer, methodsForTerm, PAYMENT_METHODS } from '../lib/payments.js'
+import { allowedTermsForCustomer, methodsForTerm } from '../lib/payments.js'
+import {
+  OrderError, requireActiveTable, resolvePayment, priceOrderItems,
+  effectiveMinimum, assertMinimum, createOrder, sendOrderEmailsInBackground,
+} from '../lib/order-create.js'
 
 const router = Router()
-
-/* Gera dentro da transação do INSERT (dois pedidos no mesmo segundo geravam o mesmo número) */
-function generateOrderNumber() {
-  const year = new Date().getFullYear()
-  const last = db.prepare(`
-    SELECT order_number FROM orders
-    WHERE order_number LIKE ?
-    ORDER BY id DESC LIMIT 1
-  `).get(`PED-${year}-%`)
-  let next = 1
-  if (last) {
-    const m = last.order_number.match(/-(\d+)$/)
-    if (m) next = parseInt(m[1], 10) + 1
-  }
-  return `PED-${year}-${String(next).padStart(5, '0')}`
-}
 
 /* GET /api/orders — pedidos do próprio cliente */
 router.get('/', requireAuth, requireCustomer, (req, res) => {
   const rows = db.prepare(`
     SELECT id, order_number, status, total_value, items_count,
-           payment_term, payment_method, created_at
+           payment_term, payment_method, source, created_at
     FROM orders
     WHERE customer_id = ?
     ORDER BY created_at DESC
@@ -57,187 +47,55 @@ router.get('/:id', requireAuth, requireCustomer, (req, res) => {
 })
 
 /* POST /api/orders
-   body: {
-     items: [{ product_id, quantity }],
-     payment_term: "30 dias",
-     payment_method: "boleto",
-     notes: "..."
-   }
-*/
-router.post('/', requireAuth, requireCustomer, (req, res) => {
+   body: { items: [{ product_id, quantity }], payment_term, payment_method, notes } */
+router.post('/', requireAuth, requireCustomer, (req, res, next) => {
   const { items, payment_term, payment_method, notes } = req.body
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Pedido vazio' })
-  }
-  if (!req.customer.price_table_id) {
-    return res.status(400).json({ error: 'Cliente sem tabela de preço vinculada' })
-  }
-  const tableId = req.customer.price_table_id
-  const table = db.prepare('SELECT * FROM price_tables WHERE id = ?').get(tableId)
-  if (!table || !table.is_active) {
-    return res.status(400).json({ error: 'Sua tabela de preço está inativa. Fale com o comercial.' })
-  }
-
-  /* Prazo precisa existir e estar liberado pra ESTE cliente */
-  const term = allowedTermsForCustomer(req.customer).find(t => t.label === payment_term)
-  if (!term) {
-    return res.status(400).json({ error: 'Prazo de pagamento inválido ou não liberado pra sua conta' })
-  }
-
-  /* Forma de pagamento tem que combinar com o prazo (28 dias = boleto; à vista = PIX/dinheiro) */
-  const methods = methodsForTerm(term.days)
-  if (!payment_method || !methods.includes(payment_method)) {
-    return res.status(400).json({
-      error: `Pra "${term.label}" a forma de pagamento precisa ser ${methods.map(m => PAYMENT_METHODS[m]).join(' ou ')}.`,
-      code: 'PAYMENT_METHOD_NOT_ALLOWED',
-      allowed_methods: methods
+  try {
+    if (!req.customer.price_table_id) {
+      return res.status(400).json({ error: 'Cliente sem tabela de preço vinculada' })
+    }
+    const table = requireActiveTable(req.customer.price_table_id, {
+      message: 'Sua tabela de preço está inativa. Fale com o comercial.'
     })
-  }
+    const { term } = resolvePayment({ customer: req.customer, payment_term, payment_method })
+    const priced = priceOrderItems({ priceTableId: table.id, items })
+    assertMinimum({ minimum: effectiveMinimum({ customer: req.customer, table }), subtotal: priced.subtotal })
 
-  /* Valida e busca preço de cada item */
-  const validatedItems = []
-  let subtotal = 0, peso = 0, volume = 0, count = 0
-
-  const stmt = db.prepare(`
-    SELECT
-      p.id AS product_id, p.sku, p.name, p.unit,
-      p.peso_kg, p.volume_m3, p.is_active AS product_active,
-      pti.price, pti.is_active AS pti_active
-    FROM products p
-    LEFT JOIN price_table_items pti ON pti.product_id = p.id AND pti.price_table_id = ?
-    WHERE p.id = ?
-  `)
-
-  for (const it of items) {
-    const qty = Number(it.quantity)
-    if (!it.product_id || !Number.isInteger(qty) || qty <= 0 || qty > 999) {
-      return res.status(400).json({ error: `Quantidade inválida no item ${it.product_id}: use um número inteiro de caixas entre 1 e 999.` })
-    }
-    const row = stmt.get(tableId, it.product_id)
-    if (!row || !row.product_active) {
-      return res.status(400).json({ error: `O produto "${row?.name || it.product_id}" saiu do catálogo. Remova do carrinho pra continuar.`, code: 'ITEM_UNAVAILABLE', product_ids: [it.product_id] })
-    }
-    if (!row.price || row.price <= 0 || !row.pti_active) {
-      return res.status(400).json({ error: `O produto "${row.name}" não está na sua tabela de preço. Remova do carrinho pra continuar.`, code: 'ITEM_UNAVAILABLE', product_ids: [it.product_id] })
-    }
-
-    const itemSubtotal = +(row.price * qty).toFixed(2)
-    validatedItems.push({
-      product_id: row.product_id,
-      product_name_snapshot: row.name,
-      product_sku_snapshot: row.sku,
-      unit_price_snapshot: row.price,
-      quantity: qty,
-      subtotal: itemSubtotal,
-      peso_kg_snapshot: (row.peso_kg || 0) * qty,
-      volume_m3_snapshot: (row.volume_m3 || 0) * qty
+    const { orderId, orderNumber } = createOrder({
+      customerId: req.customer.id,
+      priceTableId: table.id,
+      priced, term, payment_method, notes,
+      /* Entrega: usa o endereço do cadastro do cliente */
+      delivery: {
+        address: req.customer.address,
+        city: req.customer.city,
+        state: req.customer.state,
+        zip_code: req.customer.zip_code,
+      },
+      source: 'portal',
+      changedByUserId: req.user.id,
+      historyNote: 'Pedido criado pelo cliente',
     })
-    subtotal += itemSubtotal
-    peso += (row.peso_kg || 0) * qty
-    volume += (row.volume_m3 || 0) * qty
-    count += qty
-  }
 
-  subtotal = +subtotal.toFixed(2)
-  peso = +peso.toFixed(3)
-  volume = +volume.toFixed(4)
+    sendOrderEmailsInBackground({ orderId, customer: req.customer, userEmail: req.user.email })
 
-  /* Valida pedido mínimo:
-     1) override do cliente (customer.minimum_order_value > 0) tem prioridade
-     2) senão usa minimum_order_value da tabela de preço */
-  let minRequired = req.customer.minimum_order_value || 0
-  if (!minRequired || minRequired === 0) {
-    const tableRow = db.prepare('SELECT minimum_order_value FROM price_tables WHERE id = ?').get(tableId)
-    minRequired = tableRow?.minimum_order_value || 0
-  }
-  if (minRequired > 0 && subtotal < minRequired) {
-    return res.status(400).json({
-      error: `Pedido mínimo de R$ ${minRequired.toFixed(2).replace('.', ',')}. Subtotal atual: R$ ${subtotal.toFixed(2).replace('.', ',')}.`,
-      code: 'MIN_ORDER_NOT_MET',
-      minimum: minRequired,
-      subtotal
+    res.status(201).json({
+      id: orderId,
+      order_number: orderNumber,
+      total_value: priced.subtotal,
+      items_count: priced.items.length,
+      boxes_count: priced.boxes,
+      peso_total_kg: priced.peso,
+      volume_total_m3: priced.volume,
+      message: 'Pedido enviado com sucesso. Um consultor entrará em contato.'
     })
+  } catch (err) {
+    if (err instanceof OrderError) return res.status(err.status).json({ error: err.message, ...err.extra })
+    next(err)
   }
-
-  /* Cria pedido + items + history em transação */
-  let orderId, orderNumber
-
-  const tx = db.transaction(() => {
-    orderNumber = generateOrderNumber()
-    const r = db.prepare(`
-      INSERT INTO orders (
-        order_number, customer_id, price_table_id, status,
-        subtotal, total_value, payment_term, payment_method, notes,
-        items_count, peso_total_kg, volume_total_m3
-      ) VALUES (?, ?, ?, 'novo', ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      orderNumber, req.customer.id, tableId,
-      subtotal, subtotal,
-      term.label, payment_method, notes || null,
-      validatedItems.length, peso, volume
-    )
-    orderId = r.lastInsertRowid
-
-    const itemStmt = db.prepare(`
-      INSERT INTO order_items (
-        order_id, product_id, product_name_snapshot, product_sku_snapshot,
-        unit_price_snapshot, quantity, subtotal, peso_kg_snapshot, volume_m3_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-    for (const it of validatedItems) {
-      itemStmt.run(orderId, it.product_id, it.product_name_snapshot, it.product_sku_snapshot,
-                   it.unit_price_snapshot, it.quantity, it.subtotal,
-                   it.peso_kg_snapshot, it.volume_m3_snapshot)
-    }
-
-    db.prepare(`
-      INSERT INTO order_status_history (order_id, from_status, to_status, changed_by, notes)
-      VALUES (?, NULL, 'novo', ?, 'Pedido criado pelo cliente')
-    `).run(orderId, req.user.id)
-  })
-  tx()
-
-  /* Envia notificações por email (em background, não bloqueia a resposta) */
-  Promise.resolve().then(() => sendOrderEmails({ orderId, customer: req.customer, userEmail: req.user.email }))
-    .catch(err => console.error('[orders] erro nos emails:', err))
-
-  res.status(201).json({
-    id: orderId,
-    order_number: orderNumber,
-    total_value: subtotal,
-    items_count: validatedItems.length,
-    boxes_count: Math.round(count),
-    peso_total_kg: peso,
-    volume_total_m3: volume,
-    message: 'Pedido enviado com sucesso. Um consultor entrará em contato.'
-  })
 })
 
-/* Envia emails de notificação após criar pedido. Falhas são logadas mas não interrompem o fluxo. */
-async function sendOrderEmails({ orderId, customer, userEmail }) {
-  const order = db.prepare(`
-    SELECT o.*, pt.name AS price_table_name
-    FROM orders o LEFT JOIN price_tables pt ON pt.id = o.price_table_id
-    WHERE o.id = ?
-  `).get(orderId)
-  const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY id').all(orderId)
-  if (!order) return
-
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL
-  if (adminEmail) {
-    const tpl = adminNewOrderTemplate({ order, items, customer })
-    await sendMail({ to: adminEmail, subject: tpl.subject, html: tpl.html, text: tpl.text })
-  }
-
-  if (userEmail) {
-    const tpl = customerOrderConfirmedTemplate({ order, items, customer })
-    await sendMail({ to: userEmail, subject: tpl.subject, html: tpl.html, text: tpl.text })
-  }
-}
-
-/* GET /api/orders/_/payment-terms — lista pro cliente escolher no checkout.
-   Se o customer tem allowed_payment_term_ids definido, filtra por eles.
-   Se NULL/vazio, retorna todos (compatibilidade). */
+/* GET /api/orders/_/payment-terms — prazos liberados pro cliente, com as formas de pagamento */
 router.get('/_/payment-terms', requireAuth, requireCustomer, (req, res) => {
   const rows = allowedTermsForCustomer(req.customer).map(t => ({ ...t, methods: methodsForTerm(t.days) }))
   res.json({ payment_terms: rows })

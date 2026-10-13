@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, MessageSquare, Phone, Package, Clock, FileDown, Save, Printer } from 'lucide-react'
+import { ArrowLeft, MessageSquare, Phone, Package, Clock, FileDown, Save, Printer, KeyRound } from 'lucide-react'
 import { api } from '@/lib/api'
-import { Card, Badge, Button, Select, Textarea, toast } from '@/components/ui'
+import { Card, Badge, Button, Select, Textarea, toast, Modal } from '@/components/ui'
 import { PageHeader } from '@/components/admin/AdminLayout'
 import { fmtBRL, fmtNumber, fmtDateTime, STATUS_LABEL, STATUS_COLOR } from '@/lib/format'
 
@@ -24,6 +24,23 @@ export default function OrderDetail() {
   const [savingStatus, setSavingStatus] = useState(false)
   const [adminNotes, setAdminNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
+  const [grantando, setGrantando] = useState(false)
+  const [credenciais, setCredenciais] = useState<{ email: string; password: string } | null>(null)
+
+  /* Cria o login de um cliente que chegou pelo link e ainda não tem acesso */
+  async function criarAcesso() {
+    const order = data?.order
+    if (!order) return
+    const email = prompt('E-mail de acesso do cliente:', order.customer_email || '')
+    if (!email) return
+    setGrantando(true)
+    try {
+      const r = await api.post<{ email: string; temp_password: string }>(`/admin/customers/${order.customer_id}/grant-access`, { email })
+      setCredenciais({ email: r.email, password: r.temp_password })
+      load()
+    } catch (err: any) { toast.error(err.message) }
+    finally { setGrantando(false) }
+  }
 
   async function load() {
     setLoading(true)
@@ -188,6 +205,35 @@ export default function OrderDetail() {
             </div>
           </Card>
 
+          {/* Veio do link aberto */}
+          {order.source === 'public_link' && (
+            <Card className="p-4 bg-violet-50 border-violet-200">
+              <div className="text-sm text-violet-900">
+                <b>Pedido recebido pelo link público</b> da tabela {order.price_table_name}.
+              </div>
+              {!order.customer_user_id && (
+                <div className="mt-2">
+                  <div className="text-xs text-violet-800 mb-2">Esse cliente ainda não tem acesso ao portal.</div>
+                  <Button size="sm" variant="secondary" loading={grantando} onClick={criarAcesso}>
+                    <KeyRound className="w-4 h-4" /> Criar acesso
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Entrega */}
+          {order.delivery_address && (
+            <Card className="p-5">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Entrega</div>
+              <div className="text-sm text-navy-800">{order.delivery_address}</div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {order.delivery_city}{order.delivery_state ? `/${order.delivery_state}` : ''}
+                {order.delivery_zip_code ? ` · ${order.delivery_zip_code}` : ''}
+              </div>
+            </Card>
+          )}
+
           {/* Cliente */}
           <Card className="p-5">
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Cliente</div>
@@ -214,6 +260,31 @@ export default function OrderDetail() {
           </Card>
         </div>
       </div>
+
+      {credenciais && (
+        <Modal open onClose={() => setCredenciais(null)} title="Acesso criado">
+          <div className="space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
+              ⚠️ Copie agora — a senha não aparece de novo.
+            </div>
+            <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-1">
+              <div><span className="text-slate-500">E-mail:</span> <b className="text-navy-800">{credenciais.email}</b></div>
+              <div><span className="text-slate-500">Senha:</span> <b className="text-navy-800">{credenciais.password}</b></div>
+            </div>
+            <Button className="w-full" onClick={() => {
+              navigator.clipboard.writeText(`Olá! Seu acesso ao portal de pedidos da Ustulimp:
+
+📧 ${credenciais.email}
+🔑 ${credenciais.password}
+
+Acesse: ${window.location.origin}${import.meta.env.BASE_URL}login
+
+Recomendamos trocar a senha no primeiro acesso.`)
+              toast.success('Mensagem copiada')
+            }}>Copiar mensagem pro WhatsApp</Button>
+          </div>
+        </Modal>
+      )}
     </>
   )
 }

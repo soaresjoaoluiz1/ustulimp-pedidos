@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/admin/AdminLayout'
 import { fmtBRL, fmtRelative, STATUS_LABEL, STATUS_COLOR, fmtDateTime } from '@/lib/format'
 
 interface Order {
+  source?: string
   id: number
   order_number: string
   customer_id: number
@@ -143,7 +144,12 @@ export default function Orders() {
                       <Link to={`/admin/orders/${o.id}`} className="font-display font-bold text-navy-800 hover:text-brand-blue">
                         {o.order_number}
                       </Link>
-                      {o.payment_term && <div className="text-xs text-slate-500">{o.payment_term}</div>}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {o.payment_term && <span className="text-xs text-slate-500">{o.payment_term}</span>}
+                        {o.source === 'public_link' && (
+                          <Badge className="bg-violet-100 text-violet-700">Link</Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <Link to={`/admin/orders/${o.id}`} className="block">

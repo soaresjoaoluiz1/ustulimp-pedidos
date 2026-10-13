@@ -9,15 +9,17 @@ import { useEffect } from 'react'
 interface Props {
   open: boolean
   onClose: () => void
+  /** No link público não há cliente logado: mínimo e destino vêm de fora */
+  minimumOrderValue?: number
+  checkoutPath?: string
 }
 
-export default function CartSidebar({ open, onClose }: Props) {
+export default function CartSidebar({ open, onClose, minimumOrderValue: minimumProp, checkoutPath = '/app/checkout' }: Props) {
   const { items, subtotal, totalQty, totalPeso, totalVolume, updateQty, removeItem, clear } = useCart()
   const { customer } = useAuth()
   const navigate = useNavigate()
-  const minimumOrderValue = (customer as any)?.effective_minimum_order_value
-    || (customer as any)?.minimum_order_value
-    || 0
+  const minimumOrderValue = minimumProp
+    ?? ((customer as any)?.effective_minimum_order_value || (customer as any)?.minimum_order_value || 0)
   const belowMinimum = minimumOrderValue > 0 && subtotal < minimumOrderValue
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export default function CartSidebar({ open, onClose }: Props) {
 
   function checkout() {
     onClose()
-    navigate('/app/checkout')
+    navigate(checkoutPath)
   }
 
   return (

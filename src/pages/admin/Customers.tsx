@@ -18,8 +18,9 @@ function fmtCnpj(v: string) {
 }
 
 interface Customer {
+  origin?: string | null
   id: number
-  user_id?: number
+  user_id?: number | null
   name: string
   company_name?: string
   email?: string
@@ -78,6 +79,17 @@ export default function Customers() {
     return () => clearTimeout(t)
   }, [search])
 
+  /* Cliente que chegou pelo link não tem login: cria agora e mostra as credenciais */
+  async function grantAccess(c: Customer) {
+    const email = prompt(`E-mail de acesso de ${c.company_name || c.name}:`, c.email || '')
+    if (!email) return
+    try {
+      const res = await api.post<{ email: string; temp_password: string }>(`/admin/customers/${c.id}/grant-access`, { email })
+      setCredentialsModal({ email: res.email, password: res.temp_password })
+      load()
+    } catch (err: any) { toast.error(err.message) }
+  }
+
   async function resetPassword(c: Customer) {
     if (!confirm(`Gerar nova senha pra ${c.name}? A senha atual ficará inválida.`)) return
     try {
@@ -134,6 +146,8 @@ export default function Customers() {
                       <div className="text-xs text-slate-500">
                         {c.company_name ? `${c.name} · ` : ''}{c.email}
                         {!c.is_active && <Badge className="bg-slate-100 text-slate-500 ml-2">Inativo</Badge>}
+                        {c.origin === 'link' && <Badge className="bg-violet-100 text-violet-700 ml-2">Veio do link</Badge>}
+                        {!c.user_id && <Badge className="bg-amber-100 text-amber-700 ml-2">Sem acesso</Badge>}
                         {c.last_login_at && <span className="ml-2">· último: {fmtRelative(c.last_login_at)}</span>}
                       </div>
                     </td>
@@ -147,7 +161,11 @@ export default function Customers() {
                     <td className="px-4 py-3 hidden md:table-cell text-right font-semibold text-emerald-600">{fmtBRL(c.total_spent)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => resetPassword(c)} title="Resetar senha"><KeyRound className="w-4 h-4" /></Button>
+                        {c.user_id ? (
+                          <Button variant="ghost" size="sm" onClick={() => resetPassword(c)} title="Resetar senha"><KeyRound className="w-4 h-4" /></Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" onClick={() => grantAccess(c)} title="Criar acesso ao portal" className="text-emerald-600"><KeyRound className="w-4 h-4" /></Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => setEditing(c)}><Pencil className="w-4 h-4" /></Button>
                       </div>
                     </td>

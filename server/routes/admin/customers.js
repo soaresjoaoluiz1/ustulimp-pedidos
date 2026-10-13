@@ -2,6 +2,7 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { randomBytes } from 'crypto'
 import { buildUpdate, asText, asNumber, asBool } from '../../lib/update.js'
+import { onlyDigits, detectDocumentType } from '../../lib/documents.js'
 import db from '../../db.js'
 
 const router = Router()
@@ -25,11 +26,13 @@ function parseAllowedTerms(row) {
 
 /* GET /api/admin/customers?search=&active=1&price_table_id= */
 router.get('/', (req, res) => {
-  const { search, active, price_table_id } = req.query
+  const { search, active, price_table_id, origin, has_access } = req.query
   const where = []
   const params = []
   if (active !== undefined) { where.push('c.is_active = ?'); params.push(active === '1' ? 1 : 0) }
   if (price_table_id) { where.push('c.price_table_id = ?'); params.push(price_table_id) }
+  if (origin) { where.push('c.origin = ?'); params.push(origin) }
+  if (has_access !== undefined) where.push(has_access === '1' ? 'c.user_id IS NOT NULL' : 'c.user_id IS NULL')
   if (search) {
     where.push('(c.name LIKE ? OR c.company_name LIKE ? OR c.document LIKE ? OR u.email LIKE ?)')
     const q = `%${search}%`
@@ -39,7 +42,7 @@ router.get('/', (req, res) => {
   const rows = db.prepare(`
     SELECT
       c.*,
-      u.email, u.last_login_at, u.is_active AS user_active,
+      COALESCE(u.email, c.email) AS email, u.last_login_at, u.is_active AS user_active,
       pt.name AS price_table_name, pt.slug AS price_table_slug,
       (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS orders_count,
       (SELECT COALESCE(SUM(o.total_value), 0) FROM orders o WHERE o.customer_id = c.id AND o.status NOT IN ('cancelado')) AS total_spent
@@ -56,7 +59,7 @@ router.get('/', (req, res) => {
 /* GET /api/admin/customers/:id */
 router.get('/:id', (req, res) => {
   const customer = parseAllowedTerms(db.prepare(`
-    SELECT c.*, u.email, u.is_active AS user_active, u.last_login_at,
+    SELECT c.*, COALESCE(u.email, c.email) AS email, u.is_active AS user_active, u.last_login_at,
            pt.name AS price_table_name
     FROM customers c
     LEFT JOIN users u ON u.id = c.user_id
@@ -99,13 +102,14 @@ router.post('/', (req, res) => {
 
     const c = db.prepare(`
       INSERT INTO customers (
-        user_id, name, company_name, document, document_type,
+        user_id, name, company_name, document, document_digits, document_type,
         phone, whatsapp, city, state, address, zip_code, distance_km,
         price_table_id, minimum_order_value, notes, allowed_payment_term_ids
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       userId, name, company_name || null,
-      document || null, document_type || null,
+      document || null, onlyDigits(document) || null,
+      document_type || detectDocumentType(document) || null,
       phone || null, whatsapp || null,
       city || null, state || null, address || null, zip_code || null,
       distance_km || null,
@@ -143,8 +147,14 @@ router.put('/:id', (req, res) => {
       : null
   }
 
+  /* document sem máscara acompanha o document (é o que casa o cliente no link público) */
+  if (b.document !== undefined) {
+    b.document_digits = onlyDigits(b.document) || null
+    if (!b.document_type) b.document_type = detectDocumentType(b.document)
+  }
+
   const upd = buildUpdate('customers', b, {
-    name: asText, company_name: asText, document: asText, document_type: asText,
+    name: asText, company_name: asText, document: asText, document_digits: asText, document_type: asText,
     phone: asText, whatsapp: asText, city: asText, state: asText,
     address: asText, zip_code: asText, distance_km: asNumber,
     price_table_id: asNumber, minimum_order_value: v => asNumber(v) || 0,
@@ -170,6 +180,34 @@ router.post('/:id/reset-password', (req, res) => {
   const hash = bcrypt.hashSync(newPass, 10)
   db.prepare(`UPDATE users SET password = ?, password_changed_at = strftime('%Y-%m-%d %H:%M:%f','now') WHERE id = ?`).run(hash, cur.user_id)
   res.json({ ok: true, temp_password: newPass })
+})
+
+/* POST /api/admin/customers/:id/grant-access — cria o login de quem veio pelo link público.
+   Usa o e-mail do corpo ou o que ele informou no pedido (customers.email). */
+router.post('/:id/grant-access', (req, res) => {
+  const cur = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id)
+  if (!cur) return res.status(404).json({ error: 'Cliente não encontrado' })
+  if (cur.user_id) return res.status(409).json({ error: 'Esse cliente já tem acesso. Use "Resetar senha".' })
+
+  const email = String(req.body?.email || cur.email || '').toLowerCase().trim()
+  if (!email) return res.status(400).json({ error: 'Informe um e-mail pra criar o acesso.' })
+
+  const taken = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
+  if (taken) return res.status(409).json({ error: 'Já existe um usuário com esse e-mail.' })
+
+  const password = req.body?.password || generatePassword()
+  const hash = bcrypt.hashSync(password, 10)
+
+  db.transaction(() => {
+    const u = db.prepare(`
+      INSERT INTO users (name, email, password, role, is_active)
+      VALUES (?, ?, ?, 'cliente', 1)
+    `).run(cur.name, email, hash)
+    db.prepare(`UPDATE customers SET user_id = ?, email = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(u.lastInsertRowid, email, cur.id)
+  })()
+
+  res.status(201).json({ email, temp_password: password })
 })
 
 export default router
